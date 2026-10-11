@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hardenaudit"
+version = "0.1.0"
+description = "Auditor de hardening para Linux: SSH, SUID/sudo/capabilities (GTFOBins), puertos, kernel y CVEs. Solo lectura."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+keywords = ["security", "hardening", "linux", "audit", "gtfobins", "privilege-escalation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Security",
+    "Environment :: Console",
+]
+
+[project.scripts]
+hardenaudit = "hardenaudit.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["hardenaudit*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

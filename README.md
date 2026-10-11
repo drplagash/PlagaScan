@@ -1,0 +1,86 @@
+# hardenaudit
+
+Auditor de hardening para Linux, **de solo lectura y sin dependencias** (Python 3.8+ y la librería estándar).
+Revisa en segundos lo que suele abrir la puerta a un atacante local o remoto y te dice cómo arreglarlo.
+
+```
+$ sudo hardenaudit --min-severity medium
+Puntaje: 62/100  Nota: C
+CRITICAL=0  HIGH=3  MEDIUM=2  LOW=0  INFO=0
+
+[HIGH    ] Binario SUID en una ubicación inusual [PRIV-001]
+      - 4755 root /tmp/hatest/find
+    Arreglo: Verificar el origen del archivo y quitar el bit: chmod u-s /tmp/hatest/find
+
+[HIGH    ] Capabilities peligrosas en python3 [PRIV-003]
+    /tmp/hatest/python3 tiene cap_setuid (cap_setuid: cambiar el UID a 0).
+    Ref: https://gtfobins.github.io/gtfobins/python3/
+
+[HIGH    ] sudo sin contraseña para cualquier comando (%kali-trusted) [PRIV-004]
+```
+
+## Qué revisa
+
+| Categoría | Qué busca |
+|---|---|
+| `ssh` | `PermitRootLogin`, contraseñas vacías o habilitadas, `MaxAuthTries`, cifrados débiles. Respeta `Include` y `Match` como sshd. |
+| `accounts` | UID 0 extra, contraseñas vacías / MD5, hashes en `/etc/passwd`, cuentas de servicio con shell, miembros de `docker`/`lxd`/`disk` (equivalentes a root). |
+| `filesystem` | Permisos de `/etc/shadow`, `sudoers`, claves de host; `PATH` con `.` o directorios escribibles; archivos de `/etc` y unidades systemd escribibles por todos; `/tmp` sin `noexec`. |
+| `network` | Puertos en escucha fuera de loopback, servicios riesgosos expuestos (Redis, Docker API, Telnet, MongoDB...), ausencia de firewall (ufw/nftables/iptables). |
+| `privesc` | **SUID/SGID, capabilities y reglas de sudo cruzadas con una base de binarios abusables estilo [GTFOBins](https://gtfobins.github.io/)**; SUID en `/tmp` o `/home`; socket de Docker accesible. |
+| `kernel` | ASLR, `kptr_restrict`, `ptrace_scope`, `protected_symlinks`, redirects ICMP, SYN cookies, etc. |
+| `knownvulns` | Detección por versión de sudo (Baron Samedit, CVE-2025-32463), polkit (PwnKit), kernel (Dirty Pipe, Dirty COW). Sin red. |
+| `packages` | Actualizaciones de seguridad pendientes (apt/dnf), reinicio requerido. Con `--online`: CVEs de los servicios expuestos y binarios SUID consultando [OSV.dev](https://osv.dev). |
+
+## Uso
+
+```bash
+git clone https://github.com/<tu-usuario>/hardenaudit && cd hardenaudit
+sudo python3 -m hardenaudit                 # reporte completo en terminal
+sudo python3 -m hardenaudit --online        # además, CVEs por paquete (OSV.dev)
+python3 -m hardenaudit -f json -o out.json  # JSON para otras herramientas
+python3 -m hardenaudit -f md -o reporte.md  # Markdown para documentar
+sudo python3 -m hardenaudit --fail-on high  # exit 1 si hay HIGH o peor (CI)
+python3 -m hardenaudit --only privesc --only ssh
+python3 -m hardenaudit --list-checks
+```
+
+Sin root funciona, pero omite lo que necesita permisos (`/etc/shadow`, `sudoers`, firewall, procesos de otros
+usuarios) y **lo dice** en la sección "Checks omitidos" en lugar de fingir que está todo bien.
+
+Instalación opcional como comando: `pip install .` (instala el comando `hardenaudit`).
+
+## Puntaje
+
+100 menos 20 por hallazgo CRITICAL, 10 por HIGH, 4 por MEDIUM y 1 por LOW. Notas: A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F el resto.
+Es una guía para comparar un mismo equipo antes y después de arreglar cosas, no una certificación.
+
+## Límites (leelos antes de confiar en el reporte)
+
+- **Solo lectura.** No modifica nada del sistema. Los arreglos se muestran, no se aplican.
+- **Detección por versión = heurística.** Las distribuciones portan parches sin cambiar la versión upstream
+  (un `sudo 1.8.31` de Ubuntu puede estar parcheado). Esos hallazgos dicen "posible" y hay que confirmarlos.
+- **`--online` envía a api.osv.dev los nombres y versiones** de los paquetes de servicios expuestos y SUID. Nada más.
+  Hoy solo cubre Debian y Ubuntu; OSV incluye avisos que Debian decidió no parchear (baja prioridad), así que "tiene CVEs"
+  no siempre significa "es explotable".
+- **SUID/SGID**: busca con `find -xdev`, o sea solo en el sistema de archivos raíz; no entra a otros montajes.
+- La base de binarios abusables es una lista curada y propia. No reemplaza a GTFOBins: cada hallazgo enlaza a la ficha completa.
+- No es un escáner de vulnerabilidades de red ni reemplaza a Lynis, OpenSCAP o CIS-CAT. Es una revisión rápida y legible.
+
+## Desarrollo
+
+```bash
+python3 -m pytest        # los tests usan un contexto falso: no tocan tu sistema
+```
+
+Cada check es una función `fn(ctx) -> [Finding]` registrada con `@register(...)` en `hardenaudit/checks/`.
+Todo acceso al sistema pasa por `Context`, que los tests reemplazan por un doble en memoria.
+
+## Uso responsable
+
+Ejecutalo solo en sistemas propios o con autorización. La herramienta no explota nada, pero el reporte
+describe cómo escalar privilegios en la máquina auditada: tratalo como información sensible.
+
+## Licencia
+
+MIT

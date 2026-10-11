@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Paquetes sin actualizar y CVEs conocidos de los servicios expuestos."""
 import json
 import os

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Modelos de datos: severidad, hallazgos y puntaje."""
 from dataclasses import dataclass, field, asdict
 from enum import IntEnum

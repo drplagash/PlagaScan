@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Puertos en escucha y firewall."""
 import re
 from typing import Dict, List, Optional

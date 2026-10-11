@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Registro de checks. Cada módulo se registra con @register."""
 from typing import Callable, Dict, List, Tuple
 

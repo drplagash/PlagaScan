@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Configuración efectiva de sshd."""
 from typing import Dict, List, Optional
 

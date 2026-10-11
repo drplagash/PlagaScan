@@ -1,10 +1,11 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 import fnmatch
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from hardenaudit.context import Context  # noqa: E402
+from plagascan.context import Context  # noqa: E402
 
 
 class FakeContext(Context):

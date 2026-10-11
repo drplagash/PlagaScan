@@ -1,10 +1,10 @@
-# hardenaudit
+# PlagaScan
 
 Auditor de hardening para Linux, **de solo lectura y sin dependencias** (Python 3.8+ y la librería estándar).
 Revisa en segundos lo que suele abrir la puerta a un atacante local o remoto y te dice cómo arreglarlo.
 
 ```
-$ sudo hardenaudit --min-severity medium
+$ sudo plagascan --min-severity medium
 Puntaje: 62/100  Nota: C
 CRITICAL=0  HIGH=3  MEDIUM=2  LOW=0  INFO=0
 
@@ -35,20 +35,20 @@ CRITICAL=0  HIGH=3  MEDIUM=2  LOW=0  INFO=0
 ## Uso
 
 ```bash
-git clone https://github.com/<tu-usuario>/hardenaudit && cd hardenaudit
-sudo python3 -m hardenaudit                 # reporte completo en terminal
-sudo python3 -m hardenaudit --online        # además, CVEs por paquete (OSV.dev)
-python3 -m hardenaudit -f json -o out.json  # JSON para otras herramientas
-python3 -m hardenaudit -f md -o reporte.md  # Markdown para documentar
-sudo python3 -m hardenaudit --fail-on high  # exit 1 si hay HIGH o peor (CI)
-python3 -m hardenaudit --only privesc --only ssh
-python3 -m hardenaudit --list-checks
+git clone https://github.com/drplagash/plagascan && cd plagascan
+sudo python3 -m plagascan                 # reporte completo en terminal
+sudo python3 -m plagascan --online        # además, CVEs por paquete (OSV.dev)
+python3 -m plagascan -f json -o out.json  # JSON para otras herramientas
+python3 -m plagascan -f md -o reporte.md  # Markdown para documentar
+sudo python3 -m plagascan --fail-on high  # exit 1 si hay HIGH o peor (CI)
+python3 -m plagascan --only privesc --only ssh
+python3 -m plagascan --list-checks
 ```
 
 Sin root funciona, pero omite lo que necesita permisos (`/etc/shadow`, `sudoers`, firewall, procesos de otros
 usuarios) y **lo dice** en la sección "Checks omitidos" en lugar de fingir que está todo bien.
 
-Instalación opcional como comando: `pip install .` (instala el comando `hardenaudit`).
+Instalación opcional como comando: `pip install .` (instala el comando `plagascan`).
 
 ## Puntaje
 
@@ -73,7 +73,7 @@ Es una guía para comparar un mismo equipo antes y después de arreglar cosas, n
 python3 -m pytest        # los tests usan un contexto falso: no tocan tu sistema
 ```
 
-Cada check es una función `fn(ctx) -> [Finding]` registrada con `@register(...)` en `hardenaudit/checks/`.
+Cada check es una función `fn(ctx) -> [Finding]` registrada con `@register(...)` en `plagascan/checks/`.
 Todo acceso al sistema pasa por `Context`, que los tests reemplazan por un doble en memoria.
 
 ## Uso responsable
@@ -84,3 +84,7 @@ describe cómo escalar privilegios en la máquina auditada: tratalo como informa
 ## Licencia
 
 MIT
+
+## Autor
+
+DrPlaga

@@ -1,6 +1,7 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 from conftest import FakeContext, ids
-from hardenaudit.checks import ssh, accounts
-from hardenaudit.models import Severity
+from plagascan.checks import ssh, accounts
+from plagascan.models import Severity
 
 
 def test_ssh_first_occurrence_wins_and_match_block_ignored():

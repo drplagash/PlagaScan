@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Binarios abusables para escalar privilegios, al estilo GTFOBins.
 
 Es una lista curada y propia (solo nombres y una pista corta): el detalle de

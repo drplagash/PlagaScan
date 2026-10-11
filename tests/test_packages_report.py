@@ -1,10 +1,11 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 import json
 
 from conftest import FakeContext, ids
-from hardenaudit import cli
-from hardenaudit.checks import packages
-from hardenaudit.models import Finding, Severity, grade, score
-from hardenaudit.report import render_json, render_markdown, render_text
+from plagascan import cli
+from plagascan.checks import packages
+from plagascan.models import Finding, Severity, grade, score
+from plagascan.report import render_json, render_markdown, render_text
 
 APT = """\
 Listing...
@@ -116,7 +117,7 @@ def test_renderers_roundtrip():
 
 
 def test_cli_runs_checks_and_one_broken_check_does_not_abort(monkeypatch):
-    from hardenaudit import checks
+    from plagascan import checks
     checks.load_all()
 
     def boom(ctx):

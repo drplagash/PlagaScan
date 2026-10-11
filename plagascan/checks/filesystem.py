@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Permisos de archivos sensibles, PATH y opciones de montaje."""
 from typing import List
 

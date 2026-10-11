@@ -1,6 +1,7 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 from conftest import FakeContext, ids
-from hardenaudit.checks import privesc
-from hardenaudit.models import Severity
+from plagascan.checks import privesc
+from plagascan.models import Severity
 
 FIND_CMD = ('find / -xdev -type f ( -perm -4000 -o -perm -2000 ) -not -path /proc/* '
             '-printf %m %u %p\\n')

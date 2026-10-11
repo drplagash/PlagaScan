@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Parámetros del kernel (sysctl) relevantes para seguridad."""
 from typing import Callable, List, Optional, Tuple
 

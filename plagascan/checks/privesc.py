@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Vías de escalada de privilegios: SUID/SGID, capabilities, sudoers (GTFOBins)."""
 import os
 import re

@@ -1,6 +1,7 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 from conftest import FakeContext, ids
-from hardenaudit.checks import network, kernel, knownvulns, filesystem
-from hardenaudit.models import Severity
+from plagascan.checks import network, kernel, knownvulns, filesystem
+from plagascan.models import Severity
 
 SS = """\
 tcp   LISTEN 0 128  0.0.0.0:22     0.0.0.0:*  users:(("sshd",pid=811,fd=3))

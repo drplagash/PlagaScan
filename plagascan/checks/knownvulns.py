@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Vulnerabilidades locales famosas detectadas por versión (sin red).
 
 Es una heurística: las distribuciones suelen portar el parche sin cambiar el

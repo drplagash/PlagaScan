@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Acceso al sistema auditado.
 
 Todos los checks hablan con el sistema a través de `Context`. Así los tests

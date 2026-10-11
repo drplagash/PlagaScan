@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Renderizado del reporte: texto con colores, JSON y Markdown."""
 import json
 import platform
@@ -39,7 +40,7 @@ def render_text(findings: List[Finding], skipped: List[Tuple[str, str]], color: 
 
     lines = []
     s = _summary(findings)
-    lines.append("hardenaudit - %s (%s)" % (socket.gethostname(), platform.release()))
+    lines.append("plagascan - %s (%s)" % (socket.gethostname(), platform.release()))
     lines.append("Puntaje: %d/100  Nota: %s" % (s["score"], s["grade"]))
     lines.append("  ".join("%s=%d" % (k, v) for k, v in s["counts"].items()))
     lines.append("")

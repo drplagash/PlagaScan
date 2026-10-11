@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Interfaz de línea de comandos."""
 import argparse
 import sys
@@ -28,7 +29,7 @@ def run_checks(ctx: Context, only: Optional[List[str]] = None,
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="hardenaudit",
+        prog="plagascan",
         description="Auditor de hardening para Linux (solo lectura): SSH, cuentas, permisos, "
                     "puertos, SUID/sudo/capabilities (GTFOBins), kernel y CVEs.")
     p.add_argument("--online", action="store_true",
@@ -44,7 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--list-checks", action="store_true", help="listar categorías y salir")
     p.add_argument("--no-color", action="store_true")
     p.add_argument("--force", action="store_true", help="ejecutar aunque el SO no sea Linux")
-    p.add_argument("--version", action="version", version="hardenaudit " + __version__)
+    p.add_argument("--version", action="version", version="plagascan " + __version__)
     return p
 
 
@@ -56,7 +57,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("%-12s %s" % (cat, desc))
         return 0
     if not sys.platform.startswith("linux") and not args.force:
-        print("hardenaudit audita sistemas Linux (SO actual: %s). Usá --force para probar igual." %
+        print("plagascan audita sistemas Linux (SO actual: %s). Usá --force para probar igual." %
               sys.platform, file=sys.stderr)
         return 2
     try:

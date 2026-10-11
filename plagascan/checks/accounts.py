@@ -1,3 +1,4 @@
+# Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Cuentas, contraseñas y grupos equivalentes a root."""
 from typing import Dict, List
 

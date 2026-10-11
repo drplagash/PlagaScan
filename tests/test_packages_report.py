@@ -175,3 +175,28 @@ def test_cli_exit_codes(monkeypatch, capsys):
     assert cli.main(["--list-checks"]) == 0
     assert "privesc" in capsys.readouterr().out
     assert cli.main(["--min-severity", "nope", "--force"]) == 2
+
+
+def test_all_flag_turns_on_online_checks_and_default_stays_offline(monkeypatch):
+    seen = []
+
+    def fake_run_checks(ctx, only=None, skip=None):
+        seen.append((ctx.online, only))
+        return []
+
+    monkeypatch.setattr(cli.sys, "platform", "linux")
+    monkeypatch.setattr(cli, "run_checks", fake_run_checks)
+    assert cli.main([]) == 0 and seen[-1] == (False, None)          # por defecto: sin red
+    assert cli.main(["--online"]) == 0 and seen[-1][0] is True
+    assert cli.main(["--all"]) == 0 and seen[-1][0] is True
+    assert cli.main(["-a", "--only", "ssh"]) == 0 and seen[-1] == (True, ["ssh"])   # --only sigue valiendo
+
+
+def test_help_is_grouped_and_mentions_all(capsys):
+    try:
+        cli.main(["--help"])
+    except SystemExit:
+        pass
+    out = capsys.readouterr().out
+    assert "qué revisar" in out and "salida" in out and "integración (CI)" in out
+    assert "--all" in out and "ejemplos:" in out

@@ -27,25 +27,45 @@ def run_checks(ctx: Context, only: Optional[List[str]] = None,
     return findings
 
 
+EPILOG = """\
+ejemplos:
+  sudo plagascan --all               todo en un comando (recomendado; con sudo ve más cosas)
+  plagascan                          todos los checks locales, sin red
+  plagascan --only privesc --only ssh
+  sudo plagascan --all -f md -o reporte.md
+  sudo plagascan --fail-on high      para CI: código 1 si hay HIGH o peor
+"""
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="plagascan",
+        prog="plagascan", epilog=EPILOG, formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Auditor de hardening para Linux (solo lectura): SSH, cuentas, permisos, "
                     "puertos, SUID/sudo/capabilities (GTFOBins), kernel y CVEs.")
-    p.add_argument("--online", action="store_true",
-                   help="consulta OSV.dev por CVEs de los servicios expuestos (envía nombres de paquetes)")
-    p.add_argument("-f", "--format", choices=("text", "json", "md"), default="text")
-    p.add_argument("-o", "--output", help="escribir el reporte en un archivo")
-    p.add_argument("--min-severity", default="info",
+
+    g = p.add_argument_group("qué revisar (por defecto: todos los checks locales)")
+    g.add_argument("-a", "--all", action="store_true",
+                   help="TODO en un comando: todos los checks locales + consulta de CVEs en línea (--online)")
+    g.add_argument("--online", action="store_true",
+                   help="solo suma la consulta de CVEs a OSV.dev (envía nombres de paquetes de servicios expuestos)")
+    g.add_argument("--only", action="append", metavar="CATEGORIA", help="ejecutar solo estas categorías")
+    g.add_argument("--skip", action="append", metavar="CATEGORIA", help="omitir estas categorías")
+    g.add_argument("--list-checks", action="store_true", help="listar categorías y salir")
+
+    g = p.add_argument_group("salida")
+    g.add_argument("-f", "--format", choices=("text", "json", "md"), default="text")
+    g.add_argument("-o", "--output", help="escribir el reporte en un archivo")
+    g.add_argument("--min-severity", default="info",
                    help="mostrar solo desde esta severidad (info, low, medium, high, critical)")
-    p.add_argument("--fail-on", default=None,
-                   help="salir con código 1 si hay hallazgos de esta severidad o mayor (para CI)")
-    p.add_argument("--only", action="append", metavar="CATEGORIA", help="ejecutar solo estas categorías")
-    p.add_argument("--skip", action="append", metavar="CATEGORIA", help="omitir estas categorías")
-    p.add_argument("--list-checks", action="store_true", help="listar categorías y salir")
-    p.add_argument("--no-color", action="store_true")
-    p.add_argument("--force", action="store_true", help="ejecutar aunque el SO no sea Linux")
-    p.add_argument("--version", action="version", version="plagascan " + __version__)
+    g.add_argument("--no-color", action="store_true")
+
+    g = p.add_argument_group("integración (CI)")
+    g.add_argument("--fail-on", default=None,
+                   help="salir con código 1 si hay hallazgos de esta severidad o mayor")
+
+    g = p.add_argument_group("otras")
+    g.add_argument("--force", action="store_true", help="ejecutar aunque el SO no sea Linux")
+    g.add_argument("--version", action="version", version="plagascan " + __version__)
     return p
 
 
@@ -67,7 +87,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(exc, file=sys.stderr)
         return 2
 
-    ctx = Context(online=args.online)
+    ctx = Context(online=args.online or args.all)
     findings = run_checks(ctx, args.only, args.skip)
     shown = [f for f in findings if f.severity >= floor]
 

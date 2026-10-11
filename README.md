@@ -36,15 +36,25 @@ CRITICAL=0  HIGH=3  MEDIUM=2  LOW=0  INFO=0
 ## Uso
 
 ```bash
-git clone https://github.com/drplagash/plagascan && cd plagascan
-sudo python3 -m plagascan                 # reporte completo en terminal
-sudo python3 -m plagascan --online        # además, CVEs por paquete (OSV.dev)
+git clone https://github.com/drplagash/PlagaScan && cd PlagaScan
+sudo python3 -m plagascan --all           # TODO en un comando (recomendado)
+```
+
+`--all` ejecuta **todos los checks** y además la consulta de CVEs por paquete a [OSV.dev](https://osv.dev) (`--online`).
+Sin `--all` corre todos los checks locales y no usa la red. Si ya instalaste el paquete, el comando es `sudo plagascan --all`.
+
+Otras formas de ejecutarlo:
+
+```bash
+sudo python3 -m plagascan                 # solo checks locales, sin red
 python3 -m plagascan -f json -o out.json  # JSON para otras herramientas
 python3 -m plagascan -f md -o reporte.md  # Markdown para documentar
 sudo python3 -m plagascan --fail-on high  # exit 1 si hay HIGH o peor (CI)
-python3 -m plagascan --only privesc --only ssh
+python3 -m plagascan --only privesc --only ssh   # solo algunas categorías
 python3 -m plagascan --list-checks
 ```
+
+`--help` agrupa las opciones por tema (qué revisar, salida, CI).
 
 Sin root funciona, pero omite lo que necesita permisos (`/etc/shadow`, `sudoers`, firewall, procesos de otros
 usuarios) y **lo dice** en la sección "Checks omitidos" en lugar de fingir que está todo bien.

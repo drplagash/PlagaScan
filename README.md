@@ -53,8 +53,29 @@ Instalación opcional como comando: `pip install .` (instala el comando `plagasc
 
 ## Puntaje
 
-100 menos 20 por hallazgo CRITICAL, 10 por HIGH, 4 por MEDIUM y 1 por LOW. Notas: A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F el resto.
-Es una guía para comparar un mismo equipo antes y después de arreglar cosas, no una certificación.
+Cada equipo arranca con **100 puntos** y **cada hallazgo resta puntos según su gravedad**:
+
+| Gravedad | Qué significa | Ejemplos | Resta |
+|---|---|---|---|
+| CRITICAL | Se puede explotar ya, sin esfuerzo | cuentas sin contraseña, socket de Docker abierto a todos | **−20** |
+| HIGH | Camino claro a root o exposición seria | binario SUID abusable, `sudo NOPASSWD: ALL`, login de root por SSH | **−10** |
+| MEDIUM | Debilita la seguridad; hace falta otra condición para explotarlo | SSH con contraseñas, sin firewall, actualizaciones de seguridad pendientes | **−4** |
+| LOW | Buena práctica que falta | `/tmp` sin `noexec`, `kptr_restrict` en 0 | **−1** |
+| INFO | Dato informativo | lista de puertos abiertos | 0 |
+
+El puntaje final (mínimo 0) se traduce en una nota:
+
+| Puntaje | 90–100 | 75–89 | 60–74 | 40–59 | 0–39 |
+|---|---|---|---|---|---|
+| **Nota** | A | B | C | D | F |
+
+**Ejemplo:** 1 hallazgo HIGH + 2 MEDIUM + 3 LOW = 100 − 10 − 8 − 3 = **79 → nota B**.
+Se resta **por hallazgo, no por tipo**: tres binarios SUID abusables son tres hallazgos HIGH (−30).
+
+Cómo leerlo:
+- Sirve para **comparar el mismo equipo antes y después** de arreglar cosas (80 → 95 es progreso real).
+- **No sirve para comparar equipos distintos** ni es una certificación.
+- **Mirá siempre la lista, no solo la nota:** un único CRITICAL deja 80 puntos (todavía una B), pero igual hay que arreglarlo ya.
 
 ## Límites (leelos antes de confiar en el reporte)
 

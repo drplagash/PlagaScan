@@ -1,4 +1,5 @@
 # PlagaScan
+![PlagaScan - portada](docs/cover.jpg)
 
 Auditor de hardening para Linux, **de solo lectura y sin dependencias** (Python 3.8+ y la librería estándar).
 Revisa en segundos lo que suele abrir la puerta a un atacante local o remoto y te dice cómo arreglarlo.

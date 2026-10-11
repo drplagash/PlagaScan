@@ -4,7 +4,7 @@ import json
 from conftest import FakeContext, ids
 from plagascan import cli
 from plagascan.checks import packages
-from plagascan.models import Finding, Severity, grade, score
+from plagascan.models import Finding, Severity, grade, score, score_detail
 from plagascan.report import render_json, render_markdown, render_text
 
 APT = """\
@@ -97,18 +97,58 @@ def test_online_network_failure_is_skipped_not_fatal(monkeypatch):
     assert any("osv" in c for c, _ in ctx.skipped)
 
 
-def test_score_and_grade():
-    fs = [Finding("A", "t", Severity.CRITICAL, "c"), Finding("B", "t", Severity.HIGH, "c"),
-          Finding("C", "t", Severity.INFO, "c")]
-    assert score(fs) == 70 and grade(70) == "C"
+def fs_of(*severities):
+    return [Finding("X", "t", s, "c") for s in severities]
+
+
+def test_score_without_serious_findings_is_plain_subtraction():
     assert score([]) == 100 and grade(100) == "A"
-    assert score(fs * 10) == 0 and grade(0) == "F"
+    assert score(fs_of(Severity.INFO, Severity.INFO)) == 100
+    assert score(fs_of(Severity.MEDIUM, Severity.MEDIUM, Severity.LOW)) == 91
+    assert score_detail(fs_of(Severity.MEDIUM)) == (96, 96, None)
+    # 10 MEDIUM: 60 por resta, sin HIGH ni CRITICAL, no hay techo
+    assert score(fs_of(*[Severity.MEDIUM] * 10)) == 60
+
+
+def test_a_single_high_can_no_longer_give_an_A():
+    pts, raw, cap = score_detail(fs_of(Severity.HIGH))
+    assert (pts, raw, cap) == (74, 90, "HIGH")
+    assert grade(pts) == "C"
+    # con muchos LOW + 1 HIGH, tampoco pasa de C
+    assert score(fs_of(Severity.HIGH, *[Severity.LOW] * 3)) == 74
+
+
+def test_a_single_critical_means_F():
+    pts, raw, cap = score_detail(fs_of(Severity.CRITICAL))
+    assert (pts, raw, cap) == (39, 80, "CRITICAL")
+    assert grade(pts) == "F"
+    # el techo de CRITICAL manda aunque haya HIGH
+    assert score(fs_of(Severity.CRITICAL, Severity.HIGH)) == 39
+
+
+def test_cap_never_raises_a_score_that_is_already_lower():
+    fs = fs_of(*[Severity.CRITICAL] * 5)            # 0 por resta
+    assert score_detail(fs) == (0, 0, None)
+    assert score(fs_of(*[Severity.HIGH] * 4)) == 60  # 60 < 74: manda la resta
+    assert score(fs_of(Severity.CRITICAL, Severity.HIGH) * 10) == 0
+    assert grade(0) == "F"
+
+
+def test_summary_is_computed_over_all_findings_not_only_the_shown_ones():
+    all_f = fs_of(Severity.CRITICAL, Severity.LOW)
+    shown = fs_of(Severity.LOW)                     # --min-severity dejó afuera el CRITICAL
+    data = json.loads(render_json(shown, [], all_f))
+    assert data["summary"]["score"] == 39 and data["summary"]["capped_by"] == "CRITICAL"
+    assert "limitado por hallazgos CRITICAL" in render_text(shown, [], False, all_f)
+    assert "limitado por hallazgos CRITICAL" in render_markdown(shown, [], all_f)
+    plain = json.loads(render_json(shown, []))      # sin all_findings: usa lo que recibe
+    assert plain["summary"]["score"] == 99 and plain["summary"]["capped_by"] is None
 
 
 def test_renderers_roundtrip():
     fs = [Finding("X-1", "Algo grave", Severity.HIGH, "ssh", "detalle", "arreglo", ["ev1"], ["http://r"])]
     data = json.loads(render_json(fs, [("ssh", "porque sí")]))
-    assert data["summary"]["score"] == 90
+    assert data["summary"]["score"] == 74 and data["summary"]["score_before_cap"] == 90
     assert data["findings"][0]["severity"] == "HIGH"
     assert data["skipped"][0]["reason"] == "porque sí"
     assert "Algo grave" in render_text(fs, [], color=False)

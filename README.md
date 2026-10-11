@@ -63,19 +63,41 @@ Cada equipo arranca con **100 puntos** y **cada hallazgo resta puntos según su 
 | LOW | Buena práctica que falta | `/tmp` sin `noexec`, `kptr_restrict` en 0 | **−1** |
 | INFO | Dato informativo | lista de puertos abiertos | 0 |
 
-El puntaje final (mínimo 0) se traduce en una nota:
+Se resta **por hallazgo, no por tipo**: tres binarios SUID abusables son tres hallazgos HIGH (−30).
+El resultado (mínimo 0) se traduce en una nota:
 
 | Puntaje | 90–100 | 75–89 | 60–74 | 40–59 | 0–39 |
 |---|---|---|---|---|---|
 | **Nota** | A | B | C | D | F |
 
-**Ejemplo:** 1 hallazgo HIGH + 2 MEDIUM + 3 LOW = 100 − 10 − 8 − 3 = **79 → nota B**.
-Se resta **por hallazgo, no por tipo**: tres binarios SUID abusables son tres hallazgos HIGH (−30).
+### El peor hallazgo pone un techo
+
+Restar puntos no alcanza: sin otra regla, un equipo con un solo hallazgo gravísimo sacaría buena nota por tener
+todo lo demás en orden. Por eso **el peor hallazgo limita el puntaje máximo**:
+
+| Si hay al menos un... | El puntaje no puede pasar de | Nota máxima |
+|---|---|---|
+| **CRITICAL** | 39 | **F** |
+| **HIGH** | 74 | **C** |
+
+El techo solo actúa cuando el puntaje por resta lo supera; si ya era más bajo, queda como estaba.
+Cuando se aplica, el reporte lo dice: `Puntaje: 39/100  Nota: F  (limitado por hallazgos CRITICAL; por resta serían 80)`.
+
+| Caso | Por resta | Puntaje final | Nota |
+|---|---|---|---|
+| Sin hallazgos | 100 | 100 | A |
+| 20 LOW | 80 | 80 | B |
+| 5 MEDIUM + 5 LOW | 75 | 75 | B |
+| 1 HIGH | 90 | **74** (techo HIGH) | C |
+| 4 HIGH | 60 | 60 (ya era menor al techo) | C |
+| 1 CRITICAL | 80 | **39** (techo CRITICAL) | F |
+| 1 CRITICAL + 1 HIGH | 70 | **39** (techo CRITICAL) | F |
 
 Cómo leerlo:
-- Sirve para **comparar el mismo equipo antes y después** de arreglar cosas (80 → 95 es progreso real).
+- Sirve para **comparar el mismo equipo antes y después** de arreglar cosas: cada CRITICAL o HIGH que corrijas suma.
 - **No sirve para comparar equipos distintos** ni es una certificación.
-- **Mirá siempre la lista, no solo la nota:** un único CRITICAL deja 80 puntos (todavía una B), pero igual hay que arreglarlo ya.
+- El puntaje se calcula siempre con **todos** los hallazgos, aunque filtres la salida con `--min-severity`.
+- Con `-f json` el resumen incluye `score_before_cap` y `capped_by` para usarlo desde otras herramientas.
 
 ## Límites (leelos antes de confiar en el reporte)
 

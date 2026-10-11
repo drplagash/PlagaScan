@@ -71,13 +71,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     findings = run_checks(ctx, args.only, args.skip)
     shown = [f for f in findings if f.severity >= floor]
 
+    # El puntaje usa TODOS los hallazgos; --min-severity solo filtra lo que se muestra.
     if args.format == "json":
-        text = render_json(shown, ctx.skipped)
+        text = render_json(shown, ctx.skipped, findings)
     elif args.format == "md":
-        text = render_markdown(shown, ctx.skipped)
+        text = render_markdown(shown, ctx.skipped, findings)
     else:
         color = sys.stdout.isatty() and not args.no_color and not args.output
-        text = render_text(shown, ctx.skipped, color)
+        text = render_text(shown, ctx.skipped, color, findings)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:

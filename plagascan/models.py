@@ -2,7 +2,7 @@
 """Modelos de datos: severidad, hallazgos y puntaje."""
 from dataclasses import dataclass, field, asdict
 from enum import IntEnum
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 
 class Severity(IntEnum):
@@ -47,9 +47,28 @@ class Finding:
         return d
 
 
+# Techo del puntaje según el peor hallazgo. Restar puntos no alcanza: sin esto, un solo
+# CRITICAL dejaba una "B" y un HIGH una "A". Un equipo con un hallazgo grave no puede
+# sacar buena nota por tener todo lo demás en orden.
+CAPS = (
+    (Severity.CRITICAL, 39),   # cualquier CRITICAL -> nota F
+    (Severity.HIGH, 74),       # cualquier HIGH     -> como mucho nota C
+)
+
+
+def score_detail(findings: List[Finding]) -> Tuple[int, int, Optional[str]]:
+    """(puntaje final, puntaje por resta, severidad que puso el techo o None)."""
+    raw = max(0, 100 - sum(WEIGHTS[f.severity] for f in findings))
+    for severity, cap in CAPS:
+        if any(f.severity == severity for f in findings):
+            if raw > cap:
+                return cap, raw, severity.name
+            return raw, raw, None
+    return raw, raw, None
+
+
 def score(findings: List[Finding]) -> int:
-    total = sum(WEIGHTS[f.severity] for f in findings)
-    return max(0, 100 - total)
+    return score_detail(findings)[0]
 
 
 def grade(points: int) -> str:

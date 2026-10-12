@@ -37,6 +37,16 @@ SYSCTLS: List[Check] = [
      "Reverse path filtering desactivado (spoofing)", "net.ipv4.conf.all.rp_filter=1"),
     ("net/ipv4/tcp_syncookies", lambda v: v == 1, Severity.LOW,
      "SYN cookies desactivadas", "net.ipv4.tcp_syncookies=1"),
+    ("kernel/sysrq", lambda v: v != 1, Severity.LOW,
+     "SysRq totalmente habilitado", "kernel.sysrq=0 (o una máscara restringida)"),
+    ("kernel/perf_event_paranoid", lambda v: v >= 2, Severity.LOW,
+     "perf_event accesible a usuarios sin privilegios", "kernel.perf_event_paranoid=2 (o 3)"),
+    ("fs/protected_fifos", lambda v: v >= 1, Severity.LOW,
+     "protected_fifos desactivado", "fs.protected_fifos=1"),
+    ("fs/protected_regular", lambda v: v >= 1, Severity.LOW,
+     "protected_regular desactivado", "fs.protected_regular=1"),
+    ("net/ipv4/icmp_echo_ignore_broadcasts", lambda v: v == 1, Severity.LOW,
+     "Responde a pings de broadcast (amplificación smurf)", "net.ipv4.icmp_echo_ignore_broadcasts=1"),
 ]
 
 

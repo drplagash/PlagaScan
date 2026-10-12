@@ -7,6 +7,7 @@ La herramienta es de solo lectura: nunca modifica nada del sistema.
 """
 import glob as _glob
 import os
+import socket
 import subprocess
 from typing import Dict, List, Optional, Tuple
 
@@ -64,6 +65,29 @@ class Context:
 
     def getenv(self, name: str) -> Optional[str]:
         return os.environ.get(name)
+
+    def probe(self, host: str, port: int, payload: bytes, timeout: float = 2.0) -> Optional[bytes]:
+        """Envía `payload` a un puerto de ESTE equipo y devuelve hasta 4 KB de respuesta.
+
+        Solo se usa con direcciones de los puertos que el propio equipo tiene en
+        escucha, para saber si un servicio responde sin pedir credenciales.
+        """
+        try:
+            with socket.create_connection((host, port), timeout=timeout) as s:
+                s.settimeout(timeout)
+                s.sendall(payload)
+                data = b""
+                try:
+                    while len(data) < 4096:
+                        chunk = s.recv(4096)
+                        if not chunk:
+                            break
+                        data += chunk
+                except socket.timeout:
+                    pass
+                return data
+        except OSError:
+            return None
 
     # --- registro de omisiones --------------------------------------------
     def skip(self, check: str, reason: str) -> None:

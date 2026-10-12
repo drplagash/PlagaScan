@@ -16,6 +16,7 @@ def load_all() -> None:
     # El orden de importación es el orden de ejecución; `packages` va al
     # final porque reutiliza datos que dejan los checks anteriores.
     from . import ssh, accounts, filesystem, network, privesc, kernel  # noqa: F401
+    from . import services, sensitive, scheduling, policy, hardening  # noqa: F401
     from . import knownvulns, packages  # noqa: F401
 
 

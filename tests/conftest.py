@@ -12,13 +12,14 @@ class FakeContext(Context):
     """Contexto en memoria: archivos, comandos y stats simulados."""
 
     def __init__(self, files=None, commands=None, stats=None, env=None,
-                 root=True, online=False):
+                 root=True, online=False, probes=None):
         super().__init__(online=online)
         self.is_root = root
         self.files = files or {}
         self.commands = commands or {}
         self.stats = stats or {}
         self.env = env or {}
+        self.probes = probes or {}
 
     def run(self, argv, timeout=30):
         return self.commands.get(" ".join(argv))
@@ -34,6 +35,9 @@ class FakeContext(Context):
 
     def glob(self, pattern):
         return sorted(p for p in self.files if fnmatch.fnmatch(p, pattern))
+
+    def probe(self, host, port, payload, timeout=2.0):
+        return self.probes.get(port)
 
     def getenv(self, name):
         return self.env.get(name)

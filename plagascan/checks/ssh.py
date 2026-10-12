@@ -1,6 +1,9 @@
 # Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Configuración efectiva de sshd."""
-from typing import Dict, List, Optional
+import base64
+import re
+import struct
+from typing import Dict, List, Optional, Tuple
 
 from . import register
 from ..models import Finding, Severity
@@ -18,6 +21,8 @@ DEFAULTS = {
     "permituserenvironment": "no",
     "port": "22",
     "protocol": "2",
+    "hostbasedauthentication": "no",
+    "ignorerhosts": "yes",
 }
 
 WEAK_ALGOS = ("3des", "arcfour", "blowfish", "cast128", "-cbc", "hmac-md5",
@@ -87,7 +92,7 @@ def _get(cfg: Dict[str, str], key: str) -> str:
     return cfg.get(key, DEFAULTS.get(key, "")).lower()
 
 
-@register(CAT, "Configuración de SSH")
+@register(CAT, "Configuración y claves de SSH")
 def check_ssh(ctx) -> List[Finding]:
     out: List[Finding] = []
     cfg, source = effective_config(ctx)
@@ -148,6 +153,17 @@ def check_ssh(ctx) -> List[Finding]:
             "Poner X11Forwarding no si no se usa.",
             ["X11Forwarding yes (%s)" % _src(cfg, "x11forwarding", source)]))
 
+    if _get(cfg, "hostbasedauthentication") == "yes" or _get(cfg, "ignorerhosts") == "no":
+        ev = []
+        if _get(cfg, "hostbasedauthentication") == "yes":
+            ev.append("HostbasedAuthentication yes")
+        if _get(cfg, "ignorerhosts") == "no":
+            ev.append("IgnoreRhosts no")
+        out.append(Finding(
+            "SSH-009", "SSH confía en hosts (HostbasedAuthentication / .rhosts)", sev(Severity.MEDIUM), CAT,
+            "Se puede entrar sin contraseña desde otro equipo que figure como confiable." + note,
+            "Poner HostbasedAuthentication no e IgnoreRhosts yes.", ev))
+
     if _get(cfg, "protocol") == "1":
         out.append(Finding(
             "SSH-007", "Protocolo SSH 1 habilitado", Severity.CRITICAL, CAT,
@@ -164,4 +180,120 @@ def check_ssh(ctx) -> List[Finding]:
             "Hay cifrados/MACs/KEX obsoletos habilitados.",
             "Restringir Ciphers, MACs y KexAlgorithms a los modernos (chacha20, aes-gcm, curve25519).",
             weak[:8]))
+    return out
+
+
+# --- claves y excepciones dentro de bloques Match ------------------------------------------------
+
+RISKY_MATCH = {
+    "permitemptypasswords": ("yes", Severity.CRITICAL),
+    "permitrootlogin": ("yes", Severity.HIGH),
+    "hostbasedauthentication": ("yes", Severity.MEDIUM),
+}
+
+
+def match_overrides(ctx, path: str = "/etc/ssh/sshd_config", _depth: int = 0) -> List[Tuple[str, str, str]]:
+    """[(condición Match, directiva, valor)] de las directivas peligrosas dentro de bloques Match."""
+    text = ctx.read(path)
+    if text is None or _depth > 5:
+        return []
+    found: List[Tuple[str, str, str]] = []
+    cond = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split(None, 1)
+        key, value = parts[0].lower(), (parts[1].strip() if len(parts) > 1 else "")
+        if key == "match":
+            cond = value
+        elif key == "include":
+            for pattern in value.split():
+                pattern = pattern if pattern.startswith("/") else "/etc/ssh/" + pattern
+                for inc in ctx.glob(pattern):
+                    found.extend(match_overrides(ctx, inc, _depth + 1))
+        elif cond and key in RISKY_MATCH and value.lower() == RISKY_MATCH[key][0]:
+            found.append((cond, parts[0], value))
+    return found
+
+
+_KEY_RE = re.compile(r"(ssh-rsa|ssh-dss|ssh-ed25519|ecdsa-sha2-\S+|sk-\S+)\s+([A-Za-z0-9+/=]+)")
+
+
+def key_strength(line: str) -> Optional[Tuple[str, int]]:
+    """(tipo, bits) de una línea de authorized_keys; bits=0 si no aplica o no se pudo leer."""
+    m = _KEY_RE.search(line)
+    if not m:
+        return None
+    ktype = m.group(1)
+    if ktype != "ssh-rsa":
+        return ktype, 0
+    try:
+        blob = base64.b64decode(m.group(2))
+        pos, parts = 0, []
+        for _ in range(3):
+            (n,) = struct.unpack(">I", blob[pos:pos + 4])
+            parts.append(blob[pos + 4:pos + 4 + n])
+            pos += 4 + n
+        modulus = parts[2].lstrip(b"\x00")
+        if not modulus:
+            return ktype, 0
+        return ktype, (len(modulus) - 1) * 8 + modulus[0].bit_length()
+    except (ValueError, struct.error, IndexError):
+        return ktype, 0
+
+
+@register(CAT, "Configuración y claves de SSH")
+def check_ssh_keys(ctx) -> List[Finding]:
+    out: List[Finding] = []
+
+    ov = match_overrides(ctx)
+    if ov:
+        sev = max(RISKY_MATCH[k.lower()][1] for _c, k, _v in ov)
+        out.append(Finding(
+            "SSH-010", "Bloque Match de sshd reabre una opción peligrosa", sev, CAT,
+            "Aunque la configuración global sea segura, estos usuarios/hosts quedan exceptuados.",
+            "Quitar la directiva del bloque Match o justificarla.",
+            ["Match %s: %s %s" % (c, k, v) for c, k, v in ov]))
+
+    perm, weak = [], []
+    for path in ctx.glob("/home/*/.ssh/authorized_keys") + ctx.glob("/root/.ssh/authorized_keys"):
+        st = ctx.stat(path)
+        if st and st[0] & 0o022:
+            perm.append("%04o %s" % (st[0], path))
+        sdir = ctx.stat(path.rsplit("/", 1)[0])
+        if sdir and sdir[0] & 0o022:
+            perm.append("%04o %s" % (sdir[0], path.rsplit("/", 1)[0]))
+        for n, line in enumerate((ctx.read(path) or "").splitlines(), 1):
+            ks = key_strength(line)
+            if not ks:
+                continue
+            if ks[0] == "ssh-dss":
+                weak.append("%s:%d clave DSA (obsoleta, 1024 bits)" % (path, n))
+            elif ks[0] == "ssh-rsa" and 0 < ks[1] < 2048:
+                weak.append("%s:%d clave RSA de %d bits" % (path, n, ks[1]))
+    if perm:
+        out.append(Finding(
+            "SSH-011", "authorized_keys o ~/.ssh escribibles por grupo/otros", Severity.HIGH, CAT,
+            "Otro usuario puede agregar su clave y entrar como esa cuenta.",
+            "chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys", perm))
+    if weak:
+        out.append(Finding(
+            "SSH-012", "Claves SSH autorizadas débiles", Severity.HIGH, CAT,
+            "Las claves DSA y las RSA de menos de 2048 bits son factorizables o están deprecadas.",
+            "Reemplazar por ed25519 (ssh-keygen -t ed25519).", weak))
+
+    hk = []
+    if ctx.exists("/etc/ssh/ssh_host_dsa_key"):
+        hk.append("/etc/ssh/ssh_host_dsa_key (DSA, obsoleta)")
+    pub = "/etc/ssh/ssh_host_rsa_key.pub"
+    if ctx.exists(pub):
+        info = ctx.run(["ssh-keygen", "-l", "-f", pub])
+        if info and info.split() and info.split()[0].isdigit() and int(info.split()[0]) < 2048:
+            hk.append("%s (RSA de %s bits)" % (pub, info.split()[0]))
+    if hk:
+        out.append(Finding(
+            "SSH-013", "Claves de host SSH débiles", Severity.MEDIUM, CAT,
+            "Una clave de host débil permite suplantar el servidor.",
+            "Borrar la clave DSA y regenerar la RSA con 4096 bits (o usar solo ed25519).", hk))
     return out

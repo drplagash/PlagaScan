@@ -27,12 +27,17 @@ CRITICAL=0  HIGH=3  MEDIUM=2  LOW=0  INFO=0
 
 | Category | What it looks for |
 |---|---|
-| `ssh` | `PermitRootLogin`, empty or enabled passwords, `MaxAuthTries`, weak ciphers. Honors `Include` and `Match` the way sshd does. |
+| `ssh` | `PermitRootLogin`, empty or enabled passwords, `MaxAuthTries`, weak ciphers, host-based auth. Honors `Include` and `Match` the way sshd does, and flags dangerous options re-enabled **inside** `Match` blocks. Also `authorized_keys` permissions, DSA / short RSA keys, weak host keys. Findings are lowered one level when sshd is not listening. |
 | `accounts` | Extra UID 0 accounts, empty / MD5 passwords, hashes inside `/etc/passwd`, service accounts with a shell, members of `docker`/`lxd`/`disk` (root-equivalent). |
 | `filesystem` | Permissions of `/etc/shadow`, `sudoers` and host keys; a `PATH` with `.` or writable directories; world-writable files in `/etc` and systemd units; `/tmp` without `noexec`. |
 | `network` | Listeners outside loopback, risky exposed services (Redis, Docker API, Telnet, MongoDB...), missing firewall (ufw/nftables/iptables). |
 | `privesc` | **SUID/SGID, capabilities and sudo rules cross-checked against a curated [GTFOBins](https://gtfobins.github.io/)-style list of abusable binaries**; SUID files in `/tmp` or `/home`; reachable Docker socket. |
 | `kernel` | ASLR, `kptr_restrict`, `ptrace_scope`, `protected_symlinks`, ICMP redirects, SYN cookies, etc. |
+| `services` | **Anonymous / guest / no-auth access**: Samba guest shares and `map to guest`, anonymous FTP (vsftpd, proftpd, pure-ftpd), NFS exported to `*` or with `no_root_squash`, MongoDB without `authorization`, MySQL `skip-grant-tables` and anonymous users, VNC without a password, guest sessions and autologin (lightdm/GDM/SDDM), default accounts (`kali`, `pi`, `guest`, `test`...), `.rhosts` / `hosts.equiv` / legacy inetd services, default SNMP communities, rsync modules without `auth users`. Also asks local services whether they answer **without credentials** (Redis, Memcached, Elasticsearch, Docker API, Jupyter, etcd, CouchDB, RabbitMQ `guest/guest`). |
+| `sensitive` | Private keys, `.pgpass`, `.git-credentials`, `.netrc`, AWS credentials and `.env`/`.npmrc` files **with real secrets inside** that anyone can read; `/etc/shadow` backups; world-writable files and directories outside `/etc` (`/usr/local`, `/opt`, `/srv`, `/var/www`, `/home`); readable home directories on multi-user hosts. |
+| `scheduling` | Root cron jobs and root systemd services that run a script or binary other users can modify (or that lives in a writable directory); wildcard injection in `tar`/`chown`/`rsync`; writable `/etc/cron.*`. |
+| `policy` | `PASS_MAX_DAYS`, weak `ENCRYPT_METHOD`, PAM `nullok`, missing `pam_pwquality` and account lockout (`pam_faillock`), short `minlen`. |
+| `hardening` | AppArmor/SELinux, `core_pattern` piping to a writable program, loaded risky kernel modules (dccp, sctp, rds, tipc, rare filesystems), SSH with passwords and no fail2ban/sshguard/crowdsec. |
 | `knownvulns` | Version-based detection for sudo (Baron Samedit, CVE-2025-32463), polkit (PwnKit) and the kernel (Dirty Pipe, Dirty COW). No network needed. |
 | `packages` | Pending security updates (apt/dnf), reboot required. With `--online`: CVEs for exposed services and SUID binaries via [OSV.dev](https://osv.dev). |
 
@@ -116,6 +121,10 @@ How to read it:
 ## Limitations (read before trusting a report)
 
 - **Read-only.** It never changes anything on the system. Fixes are shown, not applied.
+- **Local probes.** To tell whether a service really needs credentials, PlagaScan opens a short connection **to the
+  ports this same machine is listening on** and sends one harmless request (`PING`, `GET /`, `version`). It never
+  contacts other hosts and never tries passwords, except the well-known RabbitMQ `guest/guest` default on the local console.
+- **Config-only findings are lowered a level** when the service is not running, because they only matter if it is started.
 - **Version-based detection is a heuristic.** Distributions backport patches without changing the upstream version
   (an Ubuntu `sudo 1.8.31` may already be patched). Those findings say "possible" and need confirming.
 - **`--online` sends package names and versions to api.osv.dev** for exposed services and SUID binaries. Nothing else.
@@ -125,6 +134,13 @@ How to read it:
 - The abusable-binaries list is curated and our own. It does not replace GTFOBins: every finding links to the full entry.
 - It is not a network vulnerability scanner and does not replace Lynis, OpenSCAP or CIS-CAT. It is a fast, readable review.
 - Report output and `--help` are currently in Spanish.
+
+## Verifying the results
+
+`docs/verify.sh` cross-checks the report against independent commands and **plants known problems** (a 644 `.env` with a
+secret, a 777 script run by a root cron job, anonymous FTP, a fake open Redis...) to confirm the scanner finds them and
+stops reporting them once removed. Run it as root on a test machine: `sudo bash docs/verify.sh`. It only creates
+configuration files that do not already exist and deletes everything it created.
 
 ## Development
 

@@ -69,6 +69,20 @@ def effective_config(ctx):
     return cfg, "sshd_config"
 
 
+def _sshd_listening(ctx, cfg: Dict[str, str]):
+    """True/False si sshd escucha en su puerto; None si no se puede saber."""
+    text = ctx.run(["ss", "-H", "-tln"])
+    if not text:
+        return None
+    port = (cfg.get("port") or DEFAULTS["port"]).split()[0]
+    return any(l.split()[3:4] and l.split()[3].rsplit(":", 1)[-1] == port
+               for l in text.splitlines())
+
+
+def _src(cfg: Dict[str, str], key: str, source: str) -> str:
+    return source if key in cfg else "valor por defecto de OpenSSH"
+
+
 def _get(cfg: Dict[str, str], key: str) -> str:
     return cfg.get(key, DEFAULTS.get(key, "")).lower()
 
@@ -81,6 +95,13 @@ def check_ssh(ctx) -> List[Finding]:
         ctx.skip(CAT, "no se pudo leer la configuración de sshd")
         return out
 
+    active = _sshd_listening(ctx, cfg)
+    inactive = active is False
+    note = " sshd no está escuchando: solo aplica si se activa el servicio." if inactive else ""
+
+    def sev(base: Severity) -> Severity:
+        return Severity(max(base - 1, Severity.INFO)) if inactive and base < Severity.CRITICAL else base
+
     root = _get(cfg, "permitrootlogin")
     if root == "yes":
         out.append(Finding(
@@ -90,12 +111,12 @@ def check_ssh(ctx) -> List[Finding]:
             ["PermitRootLogin %s (%s)" % (root, source)]))
 
     if _get(cfg, "passwordauthentication") == "yes":
-        sev = Severity.MEDIUM
         out.append(Finding(
-            "SSH-002", "Autenticación por contraseña habilitada", sev, CAT,
-            "Con contraseñas activas el servicio es blanco de fuerza bruta y credential stuffing.",
+            "SSH-002", "Autenticación por contraseña habilitada", sev(Severity.MEDIUM), CAT,
+            "Con contraseñas activas el servicio es blanco de fuerza bruta y credential stuffing." + note,
             "Usar claves públicas y poner PasswordAuthentication no.",
-            ["PasswordAuthentication %s (%s)" % (_get(cfg, "passwordauthentication"), source)]))
+            ["PasswordAuthentication %s (%s)" % (
+                _get(cfg, "passwordauthentication"), _src(cfg, "passwordauthentication", source))]))
 
     if _get(cfg, "permitemptypasswords") == "yes":
         out.append(Finding(
@@ -115,15 +136,17 @@ def check_ssh(ctx) -> List[Finding]:
         tries = 6
     if tries > 4:
         out.append(Finding(
-            "SSH-005", "MaxAuthTries alto", Severity.LOW, CAT,
-            "Más intentos por conexión facilita la fuerza bruta.",
-            "Usar MaxAuthTries 3 o 4.", ["MaxAuthTries %d" % tries]))
+            "SSH-005", "MaxAuthTries alto", sev(Severity.LOW), CAT,
+            "Más intentos por conexión facilita la fuerza bruta." + note,
+            "Usar MaxAuthTries 3 o 4.",
+            ["MaxAuthTries %d (%s)" % (tries, _src(cfg, "maxauthtries", source))]))
 
     if _get(cfg, "x11forwarding") == "yes":
         out.append(Finding(
-            "SSH-006", "X11Forwarding habilitado", Severity.LOW, CAT,
-            "Amplía la superficie de ataque hacia el cliente y el servidor X.",
-            "Poner X11Forwarding no si no se usa.", ["X11Forwarding yes"]))
+            "SSH-006", "X11Forwarding habilitado", sev(Severity.LOW), CAT,
+            "Amplía la superficie de ataque hacia el cliente y el servidor X." + note,
+            "Poner X11Forwarding no si no se usa.",
+            ["X11Forwarding yes (%s)" % _src(cfg, "x11forwarding", source)]))
 
     if _get(cfg, "protocol") == "1":
         out.append(Finding(

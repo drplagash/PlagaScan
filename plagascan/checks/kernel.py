@@ -44,7 +44,7 @@ SYSCTLS: List[Check] = [
 def check_kernel(ctx) -> List[Finding]:
     out: List[Finding] = []
     read_any = False
-    for path, ok, sev, title, advice in SYSCTLS:
+    for idx, (path, ok, sev, title, advice) in enumerate(SYSCTLS, 1):
         raw = ctx.read("/proc/sys/" + path)
         if raw is None:
             continue
@@ -55,7 +55,7 @@ def check_kernel(ctx) -> List[Finding]:
             continue
         if not ok(value):
             out.append(Finding(
-                "KER-001", title, sev, CAT,
+                "KER-%03d" % idx, title, sev, CAT,
                 "Valor actual de %s: %d." % (path.replace("/", "."), value),
                 advice + "  (persistir en /etc/sysctl.d/99-hardening.conf)",
                 ["%s = %d" % (path.replace("/", "."), value)]))

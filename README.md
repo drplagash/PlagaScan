@@ -1,8 +1,9 @@
 # PlagaScan
-![PlagaScan - portada](docs/cover.jpg)
 
-Auditor de hardening para Linux, **de solo lectura y sin dependencias** (Python 3.8+ y la librería estándar).
-Revisa en segundos lo que suele abrir la puerta a un atacante local o remoto y te dice cómo arreglarlo.
+![PlagaScan - cover](docs/cover.jpg)
+
+A **read-only, zero-dependency** Linux hardening auditor (Python 3.8+, standard library only).
+In seconds it checks the things that most often open the door to a local or remote attacker, and tells you how to fix them.
 
 ```
 $ sudo plagascan --min-severity medium
@@ -20,125 +21,129 @@ CRITICAL=0  HIGH=3  MEDIUM=2  LOW=0  INFO=0
 [HIGH    ] sudo sin contraseña para cualquier comando (%kali-trusted) [PRIV-004]
 ```
 
-## Qué revisa
+> **Note:** this README is in English, but the tool's report output and `--help` are currently in **Spanish**.
 
-| Categoría | Qué busca |
+## What it checks
+
+| Category | What it looks for |
 |---|---|
-| `ssh` | `PermitRootLogin`, contraseñas vacías o habilitadas, `MaxAuthTries`, cifrados débiles. Respeta `Include` y `Match` como sshd. |
-| `accounts` | UID 0 extra, contraseñas vacías / MD5, hashes en `/etc/passwd`, cuentas de servicio con shell, miembros de `docker`/`lxd`/`disk` (equivalentes a root). |
-| `filesystem` | Permisos de `/etc/shadow`, `sudoers`, claves de host; `PATH` con `.` o directorios escribibles; archivos de `/etc` y unidades systemd escribibles por todos; `/tmp` sin `noexec`. |
-| `network` | Puertos en escucha fuera de loopback, servicios riesgosos expuestos (Redis, Docker API, Telnet, MongoDB...), ausencia de firewall (ufw/nftables/iptables). |
-| `privesc` | **SUID/SGID, capabilities y reglas de sudo cruzadas con una base de binarios abusables estilo [GTFOBins](https://gtfobins.github.io/)**; SUID en `/tmp` o `/home`; socket de Docker accesible. |
-| `kernel` | ASLR, `kptr_restrict`, `ptrace_scope`, `protected_symlinks`, redirects ICMP, SYN cookies, etc. |
-| `knownvulns` | Detección por versión de sudo (Baron Samedit, CVE-2025-32463), polkit (PwnKit), kernel (Dirty Pipe, Dirty COW). Sin red. |
-| `packages` | Actualizaciones de seguridad pendientes (apt/dnf), reinicio requerido. Con `--online`: CVEs de los servicios expuestos y binarios SUID consultando [OSV.dev](https://osv.dev). |
+| `ssh` | `PermitRootLogin`, empty or enabled passwords, `MaxAuthTries`, weak ciphers. Honors `Include` and `Match` the way sshd does. |
+| `accounts` | Extra UID 0 accounts, empty / MD5 passwords, hashes inside `/etc/passwd`, service accounts with a shell, members of `docker`/`lxd`/`disk` (root-equivalent). |
+| `filesystem` | Permissions of `/etc/shadow`, `sudoers` and host keys; a `PATH` with `.` or writable directories; world-writable files in `/etc` and systemd units; `/tmp` without `noexec`. |
+| `network` | Listeners outside loopback, risky exposed services (Redis, Docker API, Telnet, MongoDB...), missing firewall (ufw/nftables/iptables). |
+| `privesc` | **SUID/SGID, capabilities and sudo rules cross-checked against a curated [GTFOBins](https://gtfobins.github.io/)-style list of abusable binaries**; SUID files in `/tmp` or `/home`; reachable Docker socket. |
+| `kernel` | ASLR, `kptr_restrict`, `ptrace_scope`, `protected_symlinks`, ICMP redirects, SYN cookies, etc. |
+| `knownvulns` | Version-based detection for sudo (Baron Samedit, CVE-2025-32463), polkit (PwnKit) and the kernel (Dirty Pipe, Dirty COW). No network needed. |
+| `packages` | Pending security updates (apt/dnf), reboot required. With `--online`: CVEs for exposed services and SUID binaries via [OSV.dev](https://osv.dev). |
 
-## Uso
+## Usage
 
 ```bash
 git clone https://github.com/drplagash/PlagaScan && cd PlagaScan
-sudo python3 -m plagascan --all           # TODO en un comando (recomendado)
+sudo python3 -m plagascan --all           # EVERYTHING in one command (recommended)
 ```
 
-`--all` ejecuta **todos los checks** y además la consulta de CVEs por paquete a [OSV.dev](https://osv.dev) (`--online`).
-Sin `--all` corre todos los checks locales y no usa la red. Si ya instalaste el paquete, el comando es `sudo plagascan --all`.
+`--all` runs **every check** plus the per-package CVE lookup against [OSV.dev](https://osv.dev) (`--online`).
+Without `--all` it runs all the local checks and never touches the network. If you installed the package, the command is `sudo plagascan --all`.
 
-Otras formas de ejecutarlo:
+Other ways to run it:
 
 ```bash
-sudo python3 -m plagascan                 # solo checks locales, sin red
-python3 -m plagascan -f json -o out.json  # JSON para otras herramientas
-python3 -m plagascan -f md -o reporte.md  # Markdown para documentar
-sudo python3 -m plagascan --fail-on high  # exit 1 si hay HIGH o peor (CI)
-python3 -m plagascan --only privesc --only ssh   # solo algunas categorías
+sudo python3 -m plagascan                 # local checks only, no network
+python3 -m plagascan -f json -o out.json  # JSON for other tools
+python3 -m plagascan -f md -o report.md   # Markdown for documentation
+sudo python3 -m plagascan --fail-on high  # exit code 1 on HIGH or worse (CI)
+python3 -m plagascan --only privesc --only ssh   # only some categories
 python3 -m plagascan --list-checks
 ```
 
-`--help` agrupa las opciones por tema (qué revisar, salida, CI).
+`--help` groups the options by topic (what to check, output, CI).
 
-Sin root funciona, pero omite lo que necesita permisos (`/etc/shadow`, `sudoers`, firewall, procesos de otros
-usuarios) y **lo dice** en la sección "Checks omitidos" en lugar de fingir que está todo bien.
+It works without root, but skips whatever needs privileges (`/etc/shadow`, `sudoers`, the firewall, other users' processes)
+and **says so** in the "skipped checks" section instead of pretending everything is fine.
 
-Instalación opcional como comando: `pip install .` (instala el comando `plagascan`).
+Optional install as a command: `pip install .` (installs the `plagascan` command).
 
-## Puntaje
+## Scoring
 
-Cada equipo arranca con **100 puntos** y **cada hallazgo resta puntos según su gravedad**:
+Every host starts with **100 points** and **each finding subtracts points according to its severity**:
 
-| Gravedad | Qué significa | Ejemplos | Resta |
+| Severity | Meaning | Examples | Penalty |
 |---|---|---|---|
-| CRITICAL | Se puede explotar ya, sin esfuerzo | cuentas sin contraseña, socket de Docker abierto a todos | **−20** |
-| HIGH | Camino claro a root o exposición seria | binario SUID abusable, `sudo NOPASSWD: ALL`, login de root por SSH | **−10** |
-| MEDIUM | Debilita la seguridad; hace falta otra condición para explotarlo | SSH con contraseñas, sin firewall, actualizaciones de seguridad pendientes | **−4** |
-| LOW | Buena práctica que falta | `/tmp` sin `noexec`, `kptr_restrict` en 0 | **−1** |
-| INFO | Dato informativo | lista de puertos abiertos | 0 |
+| CRITICAL | Exploitable right now, no effort needed | accounts without a password, Docker socket open to everyone | **−20** |
+| HIGH | A clear path to root or a serious exposure | abusable SUID binary, `sudo NOPASSWD: ALL`, root login over SSH | **−10** |
+| MEDIUM | Weakens security; another condition is needed to exploit it | SSH password auth, no firewall, pending security updates | **−4** |
+| LOW | A missing good practice | `/tmp` without `noexec`, `kptr_restrict` at 0 | **−1** |
+| INFO | Informational | list of open ports | 0 |
 
-Se resta **por hallazgo, no por tipo**: tres binarios SUID abusables son tres hallazgos HIGH (−30).
-El resultado (mínimo 0) se traduce en una nota:
+Points are subtracted **per finding, not per type**: three abusable SUID binaries are three HIGH findings (−30).
+The result (minimum 0) maps to a grade:
 
-| Puntaje | 90–100 | 75–89 | 60–74 | 40–59 | 0–39 |
+| Score | 90–100 | 75–89 | 60–74 | 40–59 | 0–39 |
 |---|---|---|---|---|---|
-| **Nota** | A | B | C | D | F |
+| **Grade** | A | B | C | D | F |
 
-### El peor hallazgo pone un techo
+### The worst finding sets a ceiling
 
-Restar puntos no alcanza: sin otra regla, un equipo con un solo hallazgo gravísimo sacaría buena nota por tener
-todo lo demás en orden. Por eso **el peor hallazgo limita el puntaje máximo**:
+Subtracting points is not enough: without another rule, a host with a single devastating finding could still earn a good
+grade because everything else is in order. So **the worst finding caps the maximum score**:
 
-| Si hay al menos un... | El puntaje no puede pasar de | Nota máxima |
+| If there is at least one... | The score cannot exceed | Best possible grade |
 |---|---|---|
 | **CRITICAL** | 39 | **F** |
 | **HIGH** | 74 | **C** |
 
-El techo solo actúa cuando el puntaje por resta lo supera; si ya era más bajo, queda como estaba.
-Cuando se aplica, el reporte lo dice: `Puntaje: 39/100  Nota: F  (limitado por hallazgos CRITICAL; por resta serían 80)`.
+The cap only applies when the subtraction-based score is higher; if it was already lower, it stays as it was.
+When it kicks in, the report says so: `Puntaje: 39/100  Nota: F  (limitado por hallazgos CRITICAL; por resta serían 80)`
+(that is: score 39/100, grade F, capped by CRITICAL findings; subtraction alone would give 80).
 
-| Caso | Por resta | Puntaje final | Nota |
+| Case | By subtraction | Final score | Grade |
 |---|---|---|---|
-| Sin hallazgos | 100 | 100 | A |
+| No findings | 100 | 100 | A |
 | 20 LOW | 80 | 80 | B |
 | 5 MEDIUM + 5 LOW | 75 | 75 | B |
-| 1 HIGH | 90 | **74** (techo HIGH) | C |
-| 4 HIGH | 60 | 60 (ya era menor al techo) | C |
-| 1 CRITICAL | 80 | **39** (techo CRITICAL) | F |
-| 1 CRITICAL + 1 HIGH | 70 | **39** (techo CRITICAL) | F |
+| 1 HIGH | 90 | **74** (HIGH cap) | C |
+| 4 HIGH | 60 | 60 (already below the cap) | C |
+| 1 CRITICAL | 80 | **39** (CRITICAL cap) | F |
+| 1 CRITICAL + 1 HIGH | 70 | **39** (CRITICAL cap) | F |
 
-Cómo leerlo:
-- Sirve para **comparar el mismo equipo antes y después** de arreglar cosas: cada CRITICAL o HIGH que corrijas suma.
-- **No sirve para comparar equipos distintos** ni es una certificación.
-- El puntaje se calcula siempre con **todos** los hallazgos, aunque filtres la salida con `--min-severity`.
-- Con `-f json` el resumen incluye `score_before_cap` y `capped_by` para usarlo desde otras herramientas.
+How to read it:
+- It is meant to **compare the same host before and after** fixing things: every CRITICAL or HIGH you fix raises the score.
+- It is **not meant to compare different hosts**, and it is not a certification.
+- The score is always computed from **all** findings, even if you filter the output with `--min-severity`.
+- With `-f json` the summary includes `score_before_cap` and `capped_by` so other tools can use them.
 
-## Límites (leelos antes de confiar en el reporte)
+## Limitations (read before trusting a report)
 
-- **Solo lectura.** No modifica nada del sistema. Los arreglos se muestran, no se aplican.
-- **Detección por versión = heurística.** Las distribuciones portan parches sin cambiar la versión upstream
-  (un `sudo 1.8.31` de Ubuntu puede estar parcheado). Esos hallazgos dicen "posible" y hay que confirmarlos.
-- **`--online` envía a api.osv.dev los nombres y versiones** de los paquetes de servicios expuestos y SUID. Nada más.
-  Hoy solo cubre Debian y Ubuntu; OSV incluye avisos que Debian decidió no parchear (baja prioridad), así que "tiene CVEs"
-  no siempre significa "es explotable".
-- **SUID/SGID**: busca con `find -xdev`, o sea solo en el sistema de archivos raíz; no entra a otros montajes.
-- La base de binarios abusables es una lista curada y propia. No reemplaza a GTFOBins: cada hallazgo enlaza a la ficha completa.
-- No es un escáner de vulnerabilidades de red ni reemplaza a Lynis, OpenSCAP o CIS-CAT. Es una revisión rápida y legible.
+- **Read-only.** It never changes anything on the system. Fixes are shown, not applied.
+- **Version-based detection is a heuristic.** Distributions backport patches without changing the upstream version
+  (an Ubuntu `sudo 1.8.31` may already be patched). Those findings say "possible" and need confirming.
+- **`--online` sends package names and versions to api.osv.dev** for exposed services and SUID binaries. Nothing else.
+  It currently covers Debian and Ubuntu only; OSV also lists advisories that Debian chose not to patch (low priority), so
+  "has CVEs" does not always mean "exploitable".
+- **SUID/SGID** discovery uses `find -xdev`, so it only covers the root filesystem and does not descend into other mounts.
+- The abusable-binaries list is curated and our own. It does not replace GTFOBins: every finding links to the full entry.
+- It is not a network vulnerability scanner and does not replace Lynis, OpenSCAP or CIS-CAT. It is a fast, readable review.
+- Report output and `--help` are currently in Spanish.
 
-## Desarrollo
+## Development
 
 ```bash
-python3 -m pytest        # los tests usan un contexto falso: no tocan tu sistema
+python3 -m pytest        # tests use a fake context: they never touch your system
 ```
 
-Cada check es una función `fn(ctx) -> [Finding]` registrada con `@register(...)` en `plagascan/checks/`.
-Todo acceso al sistema pasa por `Context`, que los tests reemplazan por un doble en memoria.
+Each check is a function `fn(ctx) -> [Finding]` registered with `@register(...)` in `plagascan/checks/`.
+All access to the system goes through `Context`, which the tests replace with an in-memory double.
 
-## Uso responsable
+## Responsible use
 
-Ejecutalo solo en sistemas propios o con autorización. La herramienta no explota nada, pero el reporte
-describe cómo escalar privilegios en la máquina auditada: tratalo como información sensible.
+Run it only on systems you own or are authorized to assess. The tool exploits nothing, but its report
+describes how to escalate privileges on the audited machine, so treat the report as sensitive information.
 
-## Licencia
+## License
 
 MIT
 
-## Autor
+## Author
 
 DrPlaga

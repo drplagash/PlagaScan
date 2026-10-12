@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple
 from . import register
 from .accounts import parse_passwd
 from .common import (active_lines, adjust, exposed_on, listening, lower, parse_ini,
-                     parse_kv, probe_host, truthy)
+                     parse_kv, probe_host, reach, truthy)
 from ..models import Finding, Severity
 
 CAT = "services"
@@ -48,12 +48,14 @@ def _check_samba(ctx) -> List[Finding]:
     text = ctx.read("/etc/samba/smb.conf")
     if text is None:
         return []
-    active = listening(ctx, 445) or listening(ctx, 139)
+    active = reach(ctx, 445, 139)
     out = []
     for sev, fid, title, ev in analyze_samba(text):
         sev, note = adjust(sev, active)
-        out.append(Finding(fid, title, sev, CAT,
-                           "Cualquiera de la red puede leer/escribir sin credenciales." + note,
+        why = ("Cualquiera de la red puede leer/escribir sin credenciales."
+               if fid == "SVC-001" else
+               "Usuarios o contraseñas inexistentes se tratan como invitado, y los shares con guest ok quedan abiertos.")
+        out.append(Finding(fid, title, sev, CAT, why + note,
                            "Quitar guest ok/public, exigir usuarios (smbpasswd) y poner map to guest = never.",
                            ev))
     return out
@@ -63,7 +65,7 @@ def _check_samba(ctx) -> List[Finding]:
 
 def _check_ftp(ctx) -> List[Finding]:
     out: List[Finding] = []
-    active = listening(ctx, 21)
+    active = reach(ctx, 21)
     vs = ctx.read("/etc/vsftpd.conf") or ctx.read("/etc/vsftpd/vsftpd.conf")
     if vs is not None:
         cfg = {k: v.lower() for k, v in parse_kv(vs).items()}
@@ -124,7 +126,7 @@ def _check_nfs(ctx) -> List[Finding]:
     rows = analyze_exports(text)
     if not rows:
         return []
-    active = listening(ctx, 2049)
+    active = reach(ctx, 2049)
     sev, note = adjust(max(r[0] for r in rows), active)
     return [Finding("SVC-004", "NFS exporta a cualquier cliente o con no_root_squash", sev, CAT,
                     "Cualquier host puede montar el export; no_root_squash entrega root del cliente." + note,
@@ -211,7 +213,7 @@ def _check_mongo(ctx) -> List[Finding]:
     m = re.search(r"^\s*bindIp:\s*([^\s#]+)", text, re.M)
     bind = m.group(1) if m else "127.0.0.1"
     wide = any(x not in ("127.0.0.1", "localhost", "::1") for x in bind.strip("\"'").split(","))
-    sev, note = adjust(Severity.HIGH if wide else Severity.MEDIUM, listening(ctx, 27017))
+    sev, note = adjust(Severity.HIGH if wide else Severity.MEDIUM, reach(ctx, 27017))
     return [Finding("SVC-006", "MongoDB sin autenticación (security.authorization)", sev, CAT,
                     "Sin authorization: enabled cualquiera que llegue al puerto lee y escribe todo." + note,
                     "Activar security.authorization: enabled y crear usuarios.",
@@ -235,7 +237,7 @@ def _check_mysql(ctx) -> List[Finding]:
                 if re.match(r"^skip[-_]grant[-_]tables\b", l):
                     hits.append("%s: %s" % (path, l))
     if hits:
-        sev, note = adjust(Severity.CRITICAL, listening(ctx, 3306))
+        sev, note = adjust(Severity.CRITICAL, reach(ctx, 3306))
         out.append(Finding("SVC-007", "MySQL/MariaDB con skip-grant-tables", sev, CAT,
                            "Con skip-grant-tables NO se valida ningún usuario ni contraseña." + note,
                            "Quitar skip-grant-tables y reiniciar el servicio.", hits))
@@ -398,7 +400,7 @@ def _check_snmp(ctx) -> List[Finding]:
     rows = analyze_snmp(text) if text else []
     if not rows:
         return []
-    sev, note = adjust(max(r[0] for r in rows), listening(ctx, 161))
+    sev, note = adjust(max(r[0] for r in rows), reach(ctx, 161))
     return [Finding("SVC-012", "SNMP con community por defecto o de escritura abierta", sev, CAT,
                     "Quien conozca la community (public/private) lee la configuración o la modifica." + note,
                     "Usar SNMPv3, community aleatoria y limitar el origen.", [r[1] for r in rows])]
@@ -429,7 +431,7 @@ def _check_rsyncd(ctx) -> List[Finding]:
     rows = analyze_rsyncd(text) if text else []
     if not rows:
         return []
-    sev, note = adjust(max(r[0] for r in rows), listening(ctx, 873))
+    sev, note = adjust(max(r[0] for r in rows), reach(ctx, 873))
     return [Finding("SVC-013", "rsync daemon con módulos sin autenticación", sev, CAT,
                     "Cualquiera que llegue al puerto 873 puede leer (o escribir) esos módulos." + note,
                     "Definir 'auth users' y 'secrets file', y limitar con 'hosts allow'.", [r[1] for r in rows])]

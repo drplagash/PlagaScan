@@ -47,10 +47,25 @@ def lower(sev: Severity, steps: int = 1) -> Severity:
     return Severity(max(int(sev) - steps, int(Severity.INFO)))
 
 
-def adjust(sev: Severity, active: bool):
-    """Baja un nivel si el servicio no está escuchando; devuelve (sev, nota)."""
-    if active or sev == Severity.INFO:
+def reach(ctx, *ports: int) -> str:
+    """'exposed' (escucha fuera de loopback), 'local' (solo 127.0.0.1/::1) o 'off' (no escucha)."""
+    hit = [l for l in listeners(ctx) if l["port"] in ports]
+    if not hit:
+        return "off"
+    return "exposed" if any(is_exposed(l["host"]) for l in hit) else "local"
+
+
+def adjust(sev: Severity, state):
+    """Baja un nivel si el servicio no escucha o solo escucha en loopback; devuelve (sev, nota).
+
+    `state` es el resultado de reach(); un bool se acepta por compatibilidad (True = expuesto).
+    """
+    if isinstance(state, bool):
+        state = "exposed" if state else "off"
+    if state == "exposed" or sev == Severity.INFO:
         return sev, ""
+    if state == "local":
+        return lower(sev), " El servicio escucha solo en loopback: no es alcanzable desde la red."
     return lower(sev), " El servicio no está escuchando: aplica solo si se activa."
 
 

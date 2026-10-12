@@ -231,3 +231,19 @@ def test_rsyncd_modules_without_auth():
 
 def test_everything_clean_on_empty_system():
     assert ids(run()) == []
+
+
+def test_loopback_only_service_lowers_severity_and_says_so():
+    out = run(files={"/etc/vsftpd.conf": "anonymous_enable=YES\nanon_upload_enable=YES\n"},
+              commands={"ss -H -tulnp": ss(21, host="127.0.0.1")})
+    (f,) = by_id(out, "SVC-003")
+    assert f.severity == Severity.MEDIUM and "loopback" in f.detail
+    exposed = run(files={"/etc/vsftpd.conf": "anonymous_enable=YES\nanon_upload_enable=YES\n"},
+                  commands={"ss -H -tulnp": ss(21)})
+    assert by_id(exposed, "SVC-003")[0].severity == Severity.HIGH
+
+
+def test_samba_map_to_guest_has_its_own_explanation():
+    out = run(files={"/etc/samba/smb.conf": "[global]\n map to guest = bad user\n"})
+    (f,) = by_id(out, "SVC-002")
+    assert "invitado" in f.detail and "leer/escribir" not in f.detail

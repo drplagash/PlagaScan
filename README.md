@@ -142,6 +142,13 @@ secret, a 777 script run by a root cron job, anonymous FTP, a fake open Redis...
 stops reporting them once removed. Run it as root on a test machine: `sudo bash docs/verify.sh`. It only creates
 configuration files that do not already exist and deletes everything it created.
 
+## Real-service lab
+
+`docs/lab/real_up.sh` installs nothing: it configures Samba, vsftpd, rsync, SNMP and Redis (already installed) **insecurely on purpose** and
+binds them to `127.0.0.1` only, so you can compare PlagaScan against real clients (`smbclient -N`, an FTP client, `rsync://`,
+`redis-cli`). It aborts and stops everything if any of them would listen outside loopback. `docs/lab/real_down.sh` restores
+the original configuration. Use it only on a test machine.
+
 ## Development
 
 ```bash

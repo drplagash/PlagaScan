@@ -103,3 +103,19 @@ def test_filesystem_permissions_and_path():
     assert sev["Permisos excesivos en /etc/shadow"] == Severity.HIGH
     assert "Permisos excesivos en /etc/group" not in sev
     assert "FS-002" in ids(found) and "FS-003" in ids(found)
+
+
+def test_wsl_windows_drives_in_path_are_info_not_medium():
+    ctx = FakeContext(env={"PATH": "/usr/bin:/mnt/c/Windows"},
+                      stats={"/mnt/c/Windows": (0o777, 0, 0), "/usr/bin": (0o755, 0, 0)})
+    found = filesystem.check_filesystem(ctx)
+    assert "FS-002" not in ids(found)
+    (f,) = [x for x in found if x.id == "FS-007"]
+    assert f.severity == Severity.INFO
+
+
+def test_real_world_writable_path_dir_stays_medium():
+    ctx = FakeContext(env={"PATH": "/usr/bin:/opt/evil"},
+                      stats={"/opt/evil": (0o777, 0, 0), "/usr/bin": (0o755, 0, 0)})
+    (f,) = [x for x in filesystem.check_filesystem(ctx) if x.id == "FS-002"]
+    assert f.severity == Severity.MEDIUM

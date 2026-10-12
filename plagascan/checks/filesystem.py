@@ -40,19 +40,27 @@ def check_filesystem(ctx) -> List[Finding]:
             "chmod %04o %s" % (maxmode, path), ["%s %04o uid=%d" % (path, mode, uid)]))
 
     # PATH peligroso
-    bad = []
+    bad, wsl = [], []
     for entry in (ctx.getenv("PATH") or "").split(":"):
         if entry in ("", "."):
             bad.append("entrada vacía o '.' en PATH")
             continue
         st = ctx.stat(entry)
         if st and st[0] & 0o002:
-            bad.append("%s es escribible por todos" % entry)
+            # En WSL, /mnt/<letra> es el disco de Windows: sus permisos siempre salen 777.
+            (wsl if entry.startswith("/mnt/") else bad).append("%s es escribible por todos" % entry)
     if bad:
         out.append(Finding(
             "FS-002", "PATH inseguro", Severity.MEDIUM, CAT,
             "Un directorio escribible o relativo en PATH permite secuestrar comandos.",
             "Quitar '.' y entradas vacías; corregir permisos de los directorios.", bad))
+
+    if wsl:
+        out.append(Finding(
+            "FS-007", "PATH incluye unidades de Windows (WSL)", Severity.INFO, CAT,
+            "Los directorios /mnt/<letra> muestran permisos 777 por cómo WSL monta Windows; "
+            "además permiten ejecutar programas de Windows desde Linux.",
+            "Opcional: en /etc/wsl.conf poner [interop] appendWindowsPath=false.", wsl))
 
     # Archivos de configuración escribibles por todos
     ww = ctx.run(["find", "/etc", "-xdev", "-type", "f", "-perm", "-0002"], timeout=60)

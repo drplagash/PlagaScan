@@ -125,12 +125,12 @@ def check_packages(ctx) -> List[Finding]:
             Severity.HIGH if len(sec) >= 10 else Severity.MEDIUM, CAT,
             "Hay parches de seguridad publicados que todavía no están instalados.",
             "apt update && apt upgrade  (o dnf upgrade --security)",
-            ["%s -> %s" % (p["name"], p["new"]) for p in sec[:20]]))
+            ["%s -> %s" % (p["name"], p["new"]) for p in sec]))
     if other:
         out.append(Finding(
             "PKG-002", "%d actualizaciones normales pendientes" % len(other), Severity.LOW, CAT,
             "Paquetes con versión nueva disponible.", "apt upgrade",
-            ["%s -> %s" % (p["name"], p["new"]) for p in other[:10]]))
+            ["%s -> %s" % (p["name"], p["new"]) for p in other]))
 
     if ctx.exists("/var/run/reboot-required") or ctx.exists("/run/reboot-required"):
         out.append(Finding(
@@ -181,7 +181,7 @@ def _collect_targets(ctx) -> Dict[Tuple[str, str], List[str]]:
 def _online_cves(ctx, info: Dict[str, str]) -> List[Finding]:
     eco = osv_ecosystem(info)
     if not eco:
-        ctx.skip(CAT + "/osv", "OSV solo está configurado para Debian y Ubuntu")
+        ctx.skip(CAT + "/osv", "OSV solo mapea Debian y Ubuntu estables (detectado: %s %s)" % (info.get("ID", "?"), info.get("VERSION_ID", "")))
         return []
     targets = _collect_targets(ctx)
     if not targets:

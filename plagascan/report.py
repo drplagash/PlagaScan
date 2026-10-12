@@ -1,6 +1,7 @@
 # Copyright (c) 2026 DrPlaga. Licencia MIT (ver LICENSE).
 """Renderizado del reporte: texto con colores, JSON y Markdown."""
 import json
+import os
 import platform
 import socket
 import time
@@ -75,7 +76,8 @@ def render_text(findings: List[Finding], skipped: List[Tuple[str, str]], color: 
     if not findings:
         lines.append("Sin hallazgos.")
     if skipped:
-        lines.append("Checks omitidos (probá con sudo para más cobertura):")
+        hint = "" if hasattr(os, "geteuid") and os.geteuid() == 0 else " (probá con sudo para más cobertura)"
+        lines.append("Checks omitidos%s:" % hint)
         for c, r in skipped:
             lines.append("  - %s: %s" % (c, r))
     return "\n".join(lines)

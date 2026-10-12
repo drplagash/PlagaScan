@@ -23,6 +23,7 @@ RISKY_PORTS = {
     3306: ("MySQL/MariaDB", Severity.MEDIUM, "Bases de datos no deberían escuchar en todas las interfaces."),
     5432: ("PostgreSQL", Severity.MEDIUM, "Bases de datos no deberían escuchar en todas las interfaces."),
     5900: ("VNC", Severity.HIGH, "VNC suele tener autenticación débil."),
+    **{p: ("VNC", Severity.HIGH, "VNC suele tener autenticación débil.") for p in range(5901, 5910)},
     6379: ("Redis", Severity.HIGH, "Redis sin autenticación permite ejecución de comandos."),
     9200: ("Elasticsearch", Severity.HIGH, "Sin autenticación por defecto en versiones antiguas."),
     11211: ("Memcached", Severity.HIGH, "Sin autenticación; usado en ataques de amplificación."),
@@ -77,8 +78,9 @@ def check_network(ctx) -> List[Finding]:
     if exposed:
         ev = ["%s %s:%d %s" % (l["proto"], l["host"], l["port"], l["process"] or "-")
               for l in exposed]
+        n_ports = len({(l["proto"][:3], l["port"]) for l in exposed})  # IPv4+IPv6 = un puerto
         out.append(Finding(
-            "NET-001", "%d puertos escuchan fuera de loopback" % len(exposed), Severity.INFO,
+            "NET-001", "%d puertos escuchan fuera de loopback" % n_ports, Severity.INFO,
             CAT, "Cada servicio expuesto es superficie de ataque.",
             "Cerrar o limitar con firewall lo que no sea necesario.", ev[:30]))
 

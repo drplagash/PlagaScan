@@ -6,19 +6,25 @@ A **read-only, zero-dependency** Linux hardening auditor (Python 3.8+, standard 
 In seconds it checks the things that most often open the door to a local or remote attacker, and tells you how to fix them.
 
 ```
-$ sudo plagascan --min-severity medium
-Puntaje: 62/100  Nota: C
-CRITICAL=0  HIGH=3  MEDIUM=2  LOW=0  INFO=0
+$ sudo plagascan --min-severity high
+Puntaje: 56/100  Nota: D
+CRITICAL=0  HIGH=3  MEDIUM=1  LOW=10  INFO=7
 
-[HIGH    ] Binario SUID en una ubicación inusual [PRIV-001]
-      - 4755 root /tmp/hatest/find
-    Arreglo: Verificar el origen del archivo y quitar el bit: chmod u-s /tmp/hatest/find
+[HIGH    ] Miembros del grupo 'docker' (equivalente a root) [ACC-006]
+    Quien pertenece a este grupo puede montar / en un contenedor y leer/escribir todo el host.
+      - alice
+    Arreglo: Quitar del grupo a quien no lo necesite.
+    Ref: https://gtfobins.github.io/gtfobins/docker/
 
-[HIGH    ] Capabilities peligrosas en python3 [PRIV-003]
-    /tmp/hatest/python3 tiene cap_setuid (cap_setuid: cambiar el UID a 0).
-    Ref: https://gtfobins.github.io/gtfobins/python3/
+[HIGH    ] VNC expuesto en tcp/5901 [NET-002]
+    VNC suele tener autenticación débil.
+      - 0.0.0.0:5901 Xtigervnc
+    Arreglo: Escuchar solo en 127.0.0.1 o filtrar con firewall.
 
 [HIGH    ] sudo sin contraseña para cualquier comando (%kali-trusted) [PRIV-004]
+    Quien comprometa esta cuenta es root sin pasos extra.
+      - /etc/sudoers.d/kali-grant-root: %kali-trusted ... NOPASSWD: ALL
+    Arreglo: Quitar NOPASSWD o limitar los comandos permitidos.
 ```
 
 > **Note:** this README is in English, but the tool's report output and `--help` are currently in **Spanish**.
@@ -29,10 +35,10 @@ CRITICAL=0  HIGH=3  MEDIUM=2  LOW=0  INFO=0
 |---|---|
 | `ssh` | `PermitRootLogin`, empty or enabled passwords, `MaxAuthTries`, weak ciphers, host-based auth. Honors `Include` and `Match` the way sshd does, and flags dangerous options re-enabled **inside** `Match` blocks. Also `authorized_keys` permissions, DSA / short RSA keys, weak host keys. Findings are lowered one level when sshd is not listening. |
 | `accounts` | Extra UID 0 accounts, empty / MD5 passwords, hashes inside `/etc/passwd`, service accounts with a shell, members of `docker`/`lxd`/`disk` (root-equivalent). |
-| `filesystem` | Permissions of `/etc/shadow`, `sudoers` and host keys; a `PATH` with `.` or writable directories; world-writable files in `/etc` and systemd units; `/tmp` without `noexec`. |
+| `filesystem` | Permissions of `/etc/shadow`, `sudoers` and host keys; a `PATH` with `.` or writable directories (Windows drives in a WSL `PATH` are reported as INFO); world-writable files in `/etc` and systemd units; `/tmp` without `noexec`. |
 | `network` | Listeners outside loopback, risky exposed services (Redis, Docker API, Telnet, MongoDB...), missing firewall (ufw/nftables/iptables). |
 | `privesc` | **SUID/SGID, capabilities and sudo rules cross-checked against a curated [GTFOBins](https://gtfobins.github.io/)-style list of abusable binaries**; SUID files in `/tmp` or `/home`; reachable Docker socket. |
-| `kernel` | ASLR, `kptr_restrict`, `ptrace_scope`, `protected_symlinks`, ICMP redirects, SYN cookies, etc. |
+| `kernel` | ASLR, `kptr_restrict`, `ptrace_scope`, `protected_symlinks`/`hardlinks`/`fifos`/`regular`, `sysrq`, `perf_event_paranoid`, ICMP redirects and broadcasts, SYN cookies, rp_filter... Each one has its own ID (`KER-001`...). |
 | `services` | **Anonymous / guest / no-auth access**: Samba guest shares and `map to guest`, anonymous FTP (vsftpd, proftpd, pure-ftpd), NFS exported to `*` or with `no_root_squash`, MongoDB without `authorization`, MySQL `skip-grant-tables` and anonymous users, VNC without a password, guest sessions and autologin (lightdm/GDM/SDDM), default accounts (`kali`, `pi`, `guest`, `test`...), `.rhosts` / `hosts.equiv` / legacy inetd services, default SNMP communities, rsync modules without `auth users`. Also asks local services whether they answer **without credentials** (Redis, Memcached, Elasticsearch, Docker API, Jupyter, etcd, CouchDB, RabbitMQ `guest/guest`). |
 | `sensitive` | Private keys, `.pgpass`, `.git-credentials`, `.netrc`, AWS credentials and `.env`/`.npmrc` files **with real secrets inside** that anyone can read; `/etc/shadow` backups; world-writable files and directories outside `/etc` (`/usr/local`, `/opt`, `/srv`, `/var/www`, `/home`); readable home directories on multi-user hosts. |
 | `scheduling` | Root cron jobs and root systemd services that run a script or binary other users can modify (or that lives in a writable directory); wildcard injection in `tar`/`chown`/`rsync`; writable `/etc/cron.*`. |
@@ -135,6 +141,48 @@ How to read it:
 - It is not a network vulnerability scanner and does not replace Lynis, OpenSCAP or CIS-CAT. It is a fast, readable review.
 - Report output and `--help` are currently in Spanish.
 
+## What has been tested
+
+- **Unit tests:** 114 tests with an in-memory double of the system (they never touch your machine).
+  CI runs them on Python 3.8, 3.10 and 3.12.
+- **`docs/verify.sh`:** 27 checks on a real Kali (WSL2) host: cross-checks findings against independent commands, plants
+  known problems and confirms they are found and then gone.
+- **Real services:** Samba guest shares, anonymous FTP (vsftpd), an rsync module without auth and Redis without a
+  password were stood up for real (loopback only) and confirmed with `smbclient`, an FTP client, `rsync://` and `redis-cli`.
+- **Not yet tested against the real service:** NFS, MongoDB, MySQL/MariaDB and SNMP (covered by unit tests and planted
+  configuration files only). Only Kali/Debian-family hosts have been used; Ubuntu, Debian stable and RHEL-family
+  (different paths, SELinux) still need a run.
+
+## Not verified yet (as of 2026-10-12)
+
+Be careful with these: they are implemented and unit-tested, but have **not** been confirmed against the real thing.
+
+- **Real services:** NFS, MongoDB, MySQL/MariaDB and SNMP were never run for real (SNMP failed to start under WSL2). The
+  probes for Memcached, Elasticsearch, Docker API, Jupyter, etcd, CouchDB and RabbitMQ were only checked against fake
+  responses (Elasticsearch also against a fake local server in `verify.sh`).
+- **Exposed services:** every real-service test was bound to `127.0.0.1`. The "exposed to the network" severity path is
+  covered by unit tests only.
+- **Other systems:** only Kali on WSL2 has been used. Ubuntu, Debian stable, RHEL-family (paths, `dnf`, SELinux),
+  bare-metal and VMs with systemd-resolved, cron daemons or a real firewall are untested.
+- **Several users:** readable home directories, `authorized_keys` permissions, weak keys and default accounts with a real
+  `/etc/shadow` were checked with simulated data, not on a host with several real users. The RSA key-size parser was
+  validated with synthetic keys, not keys made by `ssh-keygen`.
+- **Positive cron / systemd cases:** the real host had no risky cron jobs or services, so those findings were only
+  triggered by planted files (cron) and unit tests (systemd `ExecStart`).
+- **Online CVE lookup (`--online`):** skipped on Kali (no OSV mapping); not re-run against the OSV API in the latest tests.
+- **Scale:** the `find` scans (`/home`, `/opt`, `/srv`, `/var/www`, `/usr/local`) took about 6 s on a small host. On a large
+  server they may hit their 90 s limit; that is reported as a skipped check, but it has never been triggered for real.
+- **False positives on production servers:** unknown. Several findings reflect distribution defaults (for example PAM
+  `nullok`, `PASS_MAX_DAYS 99999`, SSH defaults) and may be noisy on a normal Debian/Ubuntu server.
+- **Scoring weights** are a judgment call and have had no independent review; the tool as a whole has not been audited by a third party.
+
+## Not covered yet
+
+PostgreSQL `trust` rules, Grafana default login, Kubernetes/kubelet anonymous access, web-server leaks (directory listing,
+`server-status`), mail relays, container audits (privileged containers, published ports), per-account password expiry from
+`/etc/shadow`, auditd / time sync / Secure Boot, and comparing two runs. Weak default passwords are **not** tested by logging
+in; only the account names are reported.
+
 ## Verifying the results
 
 `docs/verify.sh` cross-checks the report against independent commands and **plants known problems** (a 644 `.env` with a
@@ -153,6 +201,7 @@ the original configuration. Use it only on a test machine.
 
 ```bash
 python3 -m pytest        # tests use a fake context: they never touch your system
+sudo bash docs/verify.sh # optional: end-to-end check on a TEST machine (see above)
 ```
 
 Each check is a function `fn(ctx) -> [Finding]` registered with `@register(...)` in `plagascan/checks/`.
@@ -162,6 +211,10 @@ All access to the system goes through `Context`, which the tests replace with an
 
 Run it only on systems you own or are authorized to assess. The tool exploits nothing, but its report
 describes how to escalate privileges on the audited machine, so treat the report as sensitive information.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

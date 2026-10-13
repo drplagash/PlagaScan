@@ -184,3 +184,9 @@ def test_fail2ban_missing_when_ssh_exposed_with_passwords():
     guarded = FakeContext(commands={"ss -H -tulnp": ss, "ss -H -tln": ss, "systemctl is-active fail2ban": "active\n"},
                           files={"/etc/ssh/sshd_config": "\n"})
     assert not by_id(hardening.check_hardening(guarded), "HARD-004")
+
+
+def test_find_timeout_is_reported_as_skipped_not_silence():
+    ctx = FakeContext(stats={"/opt": (0o755, 0, 0)})  # find no devuelve nada (None) -> expiró/no existe
+    sensitive.check_sensitive(ctx)
+    assert any("escribibles" in c for c, _r in ctx.skipped)

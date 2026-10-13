@@ -154,6 +154,8 @@ def _check_world_writable(ctx) -> List[Finding]:
         return []
     out: List[Finding] = []
     files = ctx.run(["find"] + roots + ["-xdev", "-type", "f", "-perm", "-0002", "-printf", "%m %u %p\\n"], timeout=90)
+    if files is None:
+        ctx.skip(CAT + "/escribibles", "find expiró (90 s) o no está disponible: archivos escribibles sin revisar")
     by_sev: Dict[Severity, List[str]] = {}
     for row in parse_find_modes(files or ""):
         by_sev.setdefault(_prefix_sev(row["path"]), []).append("%04o %s %s" % (row["mode"], row["owner"], row["path"]))
@@ -164,6 +166,8 @@ def _check_world_writable(ctx) -> List[Finding]:
             "chmod o-w sobre estos archivos tras verificar que no es intencional.", ev))
     dirs = ctx.run(["find"] + roots + ["-xdev", "-type", "d", "-perm", "-0002", "!", "-perm", "-1000",
                                        "-printf", "%m %u %p\\n"], timeout=90)
+    if dirs is None:
+        ctx.skip(CAT + "/directorios", "find expiró (90 s) o no está disponible: directorios escribibles sin revisar")
     by_sev = {}
     for row in parse_find_modes(dirs or ""):
         by_sev.setdefault(_prefix_sev(row["path"]), []).append("%04o %s %s" % (row["mode"], row["owner"], row["path"]))

@@ -29,6 +29,32 @@ CRITICAL=0  HIGH=3  MEDIUM=1  LOW=10  INFO=7
 
 > **Note:** this README is in English, but the tool's report output and `--help` are currently in **Spanish**.
 
+## How it works
+
+```
+                          the host being audited
+                                    |
+   +------+----------+------------+---------+---------+--------+----------+
+   | ssh  | accounts | filesystem | network | privesc | kernel | services |  ... 12 categories
+   +------+----------+------------+---------+---------+--------+----------+
+                                    |
+                      findings (CRITICAL / HIGH / MEDIUM / LOW / INFO)
+                                    |
+                   0-100 score + A-F grade (worst finding caps the grade)
+                                    |
+                        text report, or -f json / -f md
+```
+
+Every category is read-only: it inspects config files, running processes and listening sockets on the local
+host, it never changes anything and (`--online` aside) never leaves the machine.
+
+## Requirements
+
+- **Linux**, any distro. Some checks need specific tools present (`ss`/`getcap`/`dpkg` or `rpm`...) — a missing one is reported under "skipped checks", not a crash.
+- **Python 3.8+**, standard library only. No `pip install` needed to run it.
+- **Root is optional.** Without it, checks needing `/etc/shadow`, `sudoers`, the firewall or other users' processes are skipped and the report says so.
+- `--online` additionally needs outbound HTTPS to `api.osv.dev` (nothing else is contacted).
+
 ## What it checks
 
 | Category | What it looks for |

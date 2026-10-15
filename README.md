@@ -29,6 +29,12 @@ CRITICAL=0  HIGH=3  MEDIUM=1  LOW=10  INFO=7
 
 > **Note:** this README is in English, but the tool's report output and `--help` are currently in **Spanish**.
 
+## The problem
+
+Most Linux compromises do not start with a clever exploit; they start with a default left in place: root login over SSH, an extra UID 0 account, `sudo NOPASSWD: ALL`, a SUID binary that can be abused, a database listening on every interface, a world-readable `.env` with real secrets. Each one is easy to fix once you know it is there, but nobody checks dozens of config files, sockets and permissions by hand on every machine. Heavier audit suites exist, but they can be slow to set up and hard to read.
+
+PlagaScan automates that review in seconds, offline and read-only: it inspects the local system, rates each finding by severity, gives a 0–100 score with an A–F grade, and shows the fix next to each problem. It never changes anything.
+
 ## How it works
 
 ```
@@ -96,6 +102,23 @@ python3 -m plagascan --list-checks
 
 `--help` groups the options by topic (what to check, output, CI).
 
+### Flags
+
+| Flag | What it does |
+|---|---|
+| `-a`, `--all` | Everything in one command: all local checks + CVE lookup (`--online`) |
+| `--online` | Only adds the CVE lookup against OSV.dev (sends package names and versions of exposed services) |
+| `--only CATEGORY` | Run only these categories (repeatable) |
+| `--skip CATEGORY` | Skip these categories (repeatable) |
+| `--list-checks` | List categories and exit |
+| `-f {text,json,md}` | Output format |
+| `-o FILE` | Write the report to a file |
+| `--min-severity LEVEL` | Show only from this severity up (`info`, `low`, `medium`, `high`, `critical`) |
+| `--fail-on LEVEL` | Exit code `1` if there is a finding of this severity or worse (for CI) |
+| `--no-color` | Plain text |
+| `--force` | Run even if the OS is not Linux |
+| `--version` | Print the version and exit |
+
 It works without root, but skips whatever needs privileges (`/etc/shadow`, `sudoers`, the firewall, other users' processes)
 and **says so** in the "skipped checks" section instead of pretending everything is fine.
 
@@ -150,7 +173,14 @@ How to read it:
 - The score is always computed from **all** findings, even if you filter the output with `--min-severity`.
 - With `-f json` the summary includes `score_before_cap` and `capped_by` so other tools can use them.
 
-## Limitations (read before trusting a report)
+## Scope and safety
+
+- Read-only. PlagaScan never changes the system: fixes are shown, not applied.
+- Without `--online` it never leaves the machine. With `--online` it sends only package names and versions to api.osv.dev.
+- A missing tool, an unreadable file or a timed-out scan is reported under "skipped checks" with the reason; it never crashes and never pretends the host is clean.
+- Run it only on systems you own or are authorized to assess, and treat the report as sensitive.
+
+## Known limitations (read before trusting a report)
 
 - **Read-only.** It never changes anything on the system. Fixes are shown, not applied.
 - **Local probes.** To tell whether a service really needs credentials, PlagaScan opens a short connection **to the
@@ -244,7 +274,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
 
 ## Author
 

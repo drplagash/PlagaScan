@@ -5,26 +5,29 @@
 A **read-only, zero-dependency** Linux hardening auditor (Python 3.8+, standard library only).
 In seconds it checks the things that most often open the door to a local or remote attacker, and tells you how to fix them.
 
+Real run (2026-10-15) on a **Kali Linux guest under WSL2**, as a normal user (no `sudo`), so some checks are skipped and reported as such:
+
 ```
-$ sudo plagascan --min-severity high
-Puntaje: 56/100  Nota: D
-CRITICAL=0  HIGH=3  MEDIUM=1  LOW=10  INFO=7
+$ plagascan --min-severity medium
+Puntaje: 74/100  Nota: C  (limitado por hallazgos HIGH; por resta serían 76)
+CRITICAL=0  HIGH=1  MEDIUM=1  LOW=10  INFO=6
 
 [HIGH    ] Miembros del grupo 'docker' (equivalente a root) [ACC-006]
     Quien pertenece a este grupo puede montar / en un contenedor y leer/escribir todo el host.
-      - alice
+      - drplaga
     Arreglo: Quitar del grupo a quien no lo necesite.
     Ref: https://gtfobins.github.io/gtfobins/docker/
 
-[HIGH    ] VNC expuesto en tcp/5901 [NET-002]
-    VNC suele tener autenticación débil.
-      - 0.0.0.0:5901 Xtigervnc
-    Arreglo: Escuchar solo en 127.0.0.1 o filtrar con firewall.
+[MEDIUM  ] Capabilities peligrosas en slock [PRIV-003]
+    /usr/bin/slock tiene cap_dac_override (cap_dac_override: saltarse los permisos de archivos).
+      - /usr/bin/slock cap_dac_override,cap_sys_resource
+    Arreglo: Quitar con: setcap -r /usr/bin/slock
 
-[HIGH    ] sudo sin contraseña para cualquier comando (%kali-trusted) [PRIV-004]
-    Quien comprometa esta cuenta es root sin pasos extra.
-      - /etc/sudoers.d/kali-grant-root: %kali-trusted ... NOPASSWD: ALL
-    Arreglo: Quitar NOPASSWD o limitar los comandos permitidos.
+Checks omitidos (probá con sudo para más cobertura):
+  - accounts/shadow: requiere root para leer /etc/shadow
+  - privesc/sudoers: requiere root para leer /etc/sudoers
+  - sensitive/secretos: sin root no se ven los directorios de otros usuarios
+  (...)
 ```
 
 > **Note:** this README is in English, but the tool's report output and `--help` are currently in **Spanish**.
